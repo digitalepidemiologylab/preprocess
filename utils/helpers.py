@@ -422,12 +422,13 @@ def find_file(f_name, subfolder='1_merged', num_parent_dirs=4, cached=False):
         return ''
 
 def find_folder(folder_path, subfolder='data', num_par_dirs=4):
+    current_folder = os.path.dirname(os.path.realpath(__file__))
     if subfolder == '.':
         # ignore subfolder if current folder
         subfolder = ''
     for i in range(num_par_dirs):
         par_dirs = i*['..']
-        f_path = os.path.join('.', *par_dirs, subfolder, folder_path)
+        f_path = os.path.join(current_folder, *par_dirs, subfolder, folder_path)
         if os.path.isdir(f_path):
             return f_path
     raise FileNotFoundError('Folder {0} could not be found.'.format(folder_path))
