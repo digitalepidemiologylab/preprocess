@@ -1,0 +1,13 @@
+.DS_Store
+**/.ipynb_checkpoints
+**/__pycache__
+**/*.swp
+**/*.tsv
+**/*.*ckpt*
+**/*.pbtxt
+**/checkpoint
+
+# other
+project_info.json
+.ignore
+/stats*
