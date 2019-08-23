@@ -450,7 +450,8 @@ def find_project_root(num_par_dirs=8):
     for i in range(num_par_dirs):
         par_dirs = i*['..']
         current_dir = os.path.join(*par_dirs, '.git')
-        if os.path.isdir(current_dir):
+        # .git can be file (submodule) or folder (normal repo)
+        if os.path.isdir(current_dir) or os.path.isfile(current_dir):
             break
     else:
         raise FileNotFoundError('Could not find project root folder.')
