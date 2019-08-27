@@ -110,9 +110,10 @@ class ArgParse(object):
         parser.add_argument('--exclude-incorrect', dest='exclude_incorrect', action='store_true', help='Remove annotations which have been manually flagged as incorrect, default: False')
         parser.add_argument('--cutoff-worker-outliers', dest='cutoff_worker_outliers', type=float, default=None, help='Remove all annotations by workers who have agreement scores below certain Z-score threshold (a reasonable value would be 2 or 3, default: None)')
         parser.add_argument('--allow-nan', dest='allow_nan', nargs='+', choices=['id', 'text', 'question_id', 'answer_id'], default=[], required=False, help='Allow certain fields to be NaN/empty (by default each annotation has to have the fields id, text, answer_id and question_id)')
+        parser.add_argument('--contains-keywords', dest='contains_keywords', default=False, action='store_true', help='Remove annotations in which text does not contain keywords')
         parser.add_argument('--verbose', dest='verbose', action='store_true', help='Verbose output')
         args = parser.parse_args(sys.argv[2:])
-        clean_labels.run_clean_labels(args.selection_criterion, args.min_labels_cutoff, args.selection_agreement, args.mode, args.is_relevant, args.exclude_incorrect, args.cutoff_worker_outliers, args.allow_nan, args.verbose)
+        clean_labels.run_clean_labels(args.selection_criterion, args.min_labels_cutoff, args.selection_agreement, args.mode, args.is_relevant, args.exclude_incorrect, args.cutoff_worker_outliers, args.allow_nan, args.contains_keywords, args.verbose)
 
     def stats(self):
         parser = argparse.ArgumentParser(description='Output various stats about project', usage=STATS_USAGE_DESC)

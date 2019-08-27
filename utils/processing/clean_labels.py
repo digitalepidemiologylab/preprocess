@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import seaborn as sb
-from utils.helpers import find_folder, get_labelled_data
+from utils.helpers import find_folder, get_labelled_data, get_merged_data
 from tqdm import tqdm
 import logging
 
@@ -29,20 +29,23 @@ class CleanLabels(object):
         self.df_tweet = self.df.groupby('tweet_id')
         self.outliers = pd.DataFrame()
 
-    def clean_labels(self, selection_criterion='majority', min_labels_cutoff=3, selection_agreement=None, is_relevant=False, exclude_incorrect=False, cutoff_worker_outliers=None, allow_nan=[]):
+    def clean_labels(self, selection_criterion='majority', min_labels_cutoff=3, selection_agreement=None, is_relevant=False, exclude_incorrect=False,
+            contains_keywords=False, cutoff_worker_outliers=None, allow_nan=[]):
         """
         Clean labels by
         1. Apply exclude_incorrect filter (exclude annotations which were flagged as incorrect)
         2. Apply is_relevant filter (exclude tweets which were annotated as non-relevant)
         3. Apply cutoff-worker-outliers filter
         4. Getting rid of tweets with <= `min_labels_cutoff` annotations,
-        5. Combine annotations based on selection_criterion
+        5. Apply contains_keywords filter
+        6. Combine annotations based on selection_criterion
 
         :param selection_criterion: Can be "majority" (use majority vote) or "unanimous" (only select tweets with perfect agreement), default: majority
         :param min_labels_cutoff: Discard all tweets having less than min_labels_cutoff annotations
         :param selection_agreement: Consider only tweets with a certain level of annotation agreement. If provided overwrites selection param.
         :param is_relevant: Filter tweets which have been annotated as relevant/related, default: False
         :param exclude_incorrect: Remove annotations which have been manually flagged as incorrect, default: False
+        :param contains_keywords: Remove annotations of which the text does not contain keywords
         :param cutoff_worker_outliers: Remove all annotations by workers who have agreement scores below certain Z-score threshold (a reasonable value would be 2 or 3, default: None)
         """
         labels = self.df
@@ -108,6 +111,16 @@ class CleanLabels(object):
             if len(labels) == 0:
                 self.logger.info("All annotations were filtered out. No files were written.")
                 return
+        if contains_keywords:
+            self.logger.info("Apply contains-keywords filter...")
+            options.append('contains-keywords')
+            num_before = len(labels)
+            labels = self.contains_keywords(labels)
+            if self.verbose:
+                self.logger.info("... removed by contains-keywords: {:,} ({:.2f}%)".format(num_before - len(labels), 100*(num_before - len(labels))/num_before))
+            if len(labels) == 0:
+                self.logger.info("All annotations were filtered out. No files were written.")
+                return
         # Merge labels
         self.logger.info("Merge labels...")
         if selection_agreement is None:
@@ -133,6 +146,11 @@ class CleanLabels(object):
         self.logger.info('Removing annotations by {:,} annotators...'.format(len(outliers)))
         labels = labels[~labels.annotator_id.isin(outliers)]
         return labels
+
+    def contains_keywords(self, labels):
+        df = get_merged_data(usecols=['id', 'contains_keywords'])
+        labels = pd.merge(labels, df, left_on='tweet_id', right_on='id', how='inner')
+        return labels[labels.contains_keywords]
 
     def is_relevant(self, labels):
         answer_tags = labels['answer_tag'].unique()
@@ -395,11 +413,12 @@ class CleanLabels(object):
             ax.set_xlim(0, None)
         return ax
 
-def run_clean_labels(selection_criterion='majority', min_labels_cutoff=3, selection_agreement=None, mode='*', is_relevant=False, exclude_incorrect=False, cutoff_worker_outliers=None, allow_nan=[], verbose=False):
+def run_clean_labels(selection_criterion='majority', min_labels_cutoff=3, selection_agreement=None, mode='*', is_relevant=False, exclude_incorrect=False,
+        cutoff_worker_outliers=None, allow_nan=[], contains_keywords=False, verbose=False):
     logger = logging.getLogger(__name__)
     logger.info('Reading labelled data...')
     df = get_labelled_data(mode=mode)
     pl = CleanLabels(df, mode=mode, verbose=verbose)
     pl.clean_labels(selection_criterion=selection_criterion, min_labels_cutoff=min_labels_cutoff,
             selection_agreement=selection_agreement, is_relevant=is_relevant, exclude_incorrect=exclude_incorrect,
-            cutoff_worker_outliers=cutoff_worker_outliers, allow_nan=allow_nan)
+            cutoff_worker_outliers=cutoff_worker_outliers, allow_nan=allow_nan, contains_keywords=contains_keywords)

@@ -313,7 +313,10 @@ def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, 
             'entities.user_mentions': str,
             'extracted_quoted_tweet': bool,
             'favorite_count': 'Int64',
+            'has_coordinates': bool,
             'has_media': bool,
+            'has_place': bool,
+            'has_place_bounding_box': bool,
             'has_quoted_status': bool,
             'id': str,
             'in_reply_to_status_id': str,
@@ -430,7 +433,7 @@ def find_folder(folder_path, subfolder='data', num_par_dirs=4):
         par_dirs = i*['..']
         f_path = os.path.join(current_folder, *par_dirs, subfolder, folder_path)
         if os.path.isdir(f_path):
-            return f_path
+            return os.path.abspath(f_path)
     raise FileNotFoundError('Folder {0} could not be found.'.format(folder_path))
 
 def get_project_info():

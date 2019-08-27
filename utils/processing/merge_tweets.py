@@ -20,6 +20,7 @@ import itertools
 import warnings
 import utils.helpers
 import logging
+import shapely.geometry
 
 class MergeTweet(object):
     """Wrapper class for functions to process/modify tweets"""
@@ -87,21 +88,38 @@ class MergeTweet(object):
         return self.remove_control_characters(str(tweet_text))
 
     def get_coordinates_field(self):
-        coordinates = {}
+        coordinates = {'has_coordinates': False}
         if 'coordinates' in self.tweet and self.tweet['coordinates'] is not None:
             coordinates['longitude'] = self.tweet['coordinates']['coordinates'][0]
             coordinates['latitude'] = self.tweet['coordinates']['coordinates'][1]
+            coordinates['has_coordinates'] = True
         return coordinates
 
     def get_place_fields(self, keep_fields_place):
-        place_obj = {}
+        def convert_to_polygon(s):
+            if isinstance(s, list):
+                for i, _s in enumerate(s):
+                    s[i] = [float(_s[0]), float(_s[1])]
+                return shapely.geometry.Polygon(s)
+            else:
+                return None
+        place_obj = {'has_place': False, 'has_place_bounding_box': False,
+                'place.bounding_box.centroid': None, 'place.bounding_box.area': None}
         if self.tweet['place'] is not None:
+            place_obj['has_place'] = True
             for k in keep_fields_place:
                 if k == 'bounding_box':
                     try:
                         place_obj['place.bounding_box'] = self.tweet['place'][k]['coordinates'][0]
                     except (KeyError, TypeError) as e:
                         pass
+                    else:
+                        place_obj['has_place_bounding_box'] = True
+                        p = convert_to_polygon(place_obj['place.bounding_box'])
+                        if isinstance(p, shapely.geometry.Polygon):
+                            centroid = p.centroid
+                            place_obj['place.bounding_box.centroid'] = [centroid.x, centroid.y]
+                            place_obj['place.bounding_box.area'] = p.area
                 else:
                     place_obj['place.' + k] = self.remove_control_characters(self.tweet['place'][k])
         return place_obj
