@@ -1,12 +1,5 @@
 import argparse
 import sys, os
-from utils.processing.sample_tweets import SampleGenerator
-import utils.processing.merge_tweets as merge_tweets
-import utils.processing.clean_tweets as clean_tweets
-import utils.processing.sample_tweets as sample_tweets
-import utils.processing.clean_labels as clean_labels
-from utils.task_helpers import train_test_split, sync, stats, init
-import multiprocessing
 import logging
 
 USAGE_DESC = """
@@ -56,6 +49,7 @@ class ArgParse(object):
         getattr(self, args.command)()
 
     def init(self):
+        from utils.task_helpers import init
         parser = ArgParseDefault(description='Initialize project')
         parser.add_argument('-p', '--project', type=str, required=False, default='', dest='project', help='Name of project to initialize')
         parser.add_argument('--template', dest='template', action='store_true', default=False, help='Initialize project manually.')
@@ -63,6 +57,7 @@ class ArgParse(object):
         init(args.project, args.template)
 
     def merge(self):
+        import utils.processing.merge_tweets as merge_tweets
         parser = ArgParseDefault(description='Preprocess raw data to create `data/1_merged`')
         parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['original', 'anonymized'], nargs='+', help='Data source type to create (can be original, anonymized or encrypted)')
         parser.add_argument('--yearly', dest='yearly', action='store_true', default=False, help='Create yearly interval output')
@@ -72,6 +67,7 @@ class ArgParse(object):
         merge_tweets.run(dtypes=args.dtypes, no_parallel=args.no_parallel, yearly=args.yearly, verbose=args.verbose)
 
     def clean(self):
+        import utils.processing.clean_tweets as clean_tweets
         parser = ArgParseDefault(description='Clean preprocessed data to generate `data/2_cleaned`')
         parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['original', 'anonymized'], nargs='+', help='Data source type to use (can be original, anonymized or encrypted)')
         parser.add_argument('-l', '--lang', default='en_core_web_lg', required=False, help='Spacy language model. This is used for word tokenization count.')
@@ -80,6 +76,7 @@ class ArgParse(object):
         clean_tweets.run(dtypes=args.dtypes, lang=args.lang, verbose=args.verbose)
 
     def sample(self):
+        import utils.processing.sample_tweets as sample_tweets
         parser = ArgParseDefault(description='Sample cleaned data to generate `data/3_cleaned`')
         parser.add_argument('-s', '--size', type=int, required=False, dest='size', help='Number of tweets to sample')
         parser.add_argument('-bs', '--bin-size', type=int, required=False, dest='bin_size', help='Number of tweets per bin')
@@ -94,6 +91,7 @@ class ArgParse(object):
         sample_tweets.run(dtype=args.dtype, size=args.size, contains_keywords=args.contains_keywords, mode=args.mode, seed=args.seed, extend=args.extend, bin_size=args.bin_size, min_date=args.min_date, max_date=args.max_date)
 
     def batch(self):
+        from utils.processing.sample_tweets import SampleGenerator
         parser = ArgParseDefault(description='Generate new batch for labelling. As a result a new csv will be created in `data/3_sampled/batch_{batch_id}/`')
         parser.add_argument('-N', '--num_tweets', type=int, default=None, help='The number of tweets to be generated in new batch')
         parser.add_argument('-b', '--batch', type=int, default=None, help='The batch id to be generated, default: Automatically find next batch')
@@ -107,6 +105,7 @@ class ArgParse(object):
             s.generate_batch(num_tweets=args.num_tweets, batch_id=args.batch, ignore_previous=args.ignore_previous)
 
     def clean_labels(self):
+        import utils.processing.clean_labels as clean_labels
         parser = ArgParseDefault(description='Clean/merge labels from different batches to generate final training input')
         parser.add_argument('-s', '--selection-criterion', dest='selection_criterion', choices=['majority', 'unanimous'], required=False, default='majority', help='Can be "majority" (use majority vote) or "unanimous" (only select tweets with perfect agreement)')
         parser.add_argument('-l', '--min-labels-cutoff', dest='min_labels_cutoff', type=int, required=False, default=3, help='Discard all tweets having less than min_labels_cutoff annotations')
@@ -122,6 +121,7 @@ class ArgParse(object):
         clean_labels.run_clean_labels(args.selection_criterion, args.min_labels_cutoff, args.selection_agreement, args.mode, args.is_relevant, args.exclude_incorrect, args.cutoff_worker_outliers, args.allow_nan, args.contains_keywords, args.verbose)
 
     def stats(self):
+        from utils.task_helpers import stats
         parser = ArgParseDefault(description='Output various stats about project', usage=STATS_USAGE_DESC)
         parser.add_argument('command', choices=['all', 'overview', 'sample', 'annotation', 'annotator_outliers', 'annotation_cleaned'], help='Subcommand to run')
         args = parser.parse_args(sys.argv[2:3])
@@ -144,6 +144,7 @@ class ArgParse(object):
             stats(args.command)
 
     def split(self):
+        from utils.task_helpers import train_test_split
         parser = ArgParseDefault(description='Split annotated data into training and test data set')
         parser.add_argument('--question', type=str, required=False, default='sentiment', help='Which data to load (has to be a valid question tag)')
         parser.add_argument('--name', type=str, required=False, default='', help='In case there are multiple cleaned labelled data output files give name of file (without csv ending), default: No name provided (works only if a single file is present).')
@@ -157,6 +158,7 @@ class ArgParse(object):
         train_test_split(question=args.question, test_size=args.test_size, seed=args.seed, name=args.name, balanced_labels=args.balanced_labels, all_questions=args.all_questions, label_tags=args.label_tags, has_label=args.has_label)
 
     def sync(self):
+        from utils.task_helpers import sync
         parser = ArgParseDefault(description='Sync project data from S3')
         parser.add_argument('-s', '--source', choices=['all', 'streaming', 'annotation', 'media'], required=False, default='all', help='Type of data to be synced. By default sync all data belonging to this project.')
         parser.add_argument('-l', '--last', required=False, type=int, help='Sync streaming data of last n days')
