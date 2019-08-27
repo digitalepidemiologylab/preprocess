@@ -3,23 +3,20 @@ import re
 import time
 import logging
 from utils.helpers import get_merged_data
-from nltk import download
-from nltk.tokenize import TweetTokenizer
-from nltk.corpus import words
-from nltk.corpus import stopwords
 from collections import Counter
+import spacy
 
 class CleanTweets():
     """Filter operation to get from raw data to cleaned data"""
 
-    def __init__(self, df, verbose=True):
+    def __init__(self, df, lang='en_core_web_lg', verbose=True):
         self.verbose = verbose
         self.df = df
-        self.en_stopwords = frozenset([s.lower() for s in stopwords.words('english')])
-        self.en_words = frozenset([s.lower() for s in words.words('en')])
+        try:
+            self.nlp = spacy.load(lang)
+        except OSError:
+            raise Exception('It seems like the spacy corpus {lang} is not installed! You can install it using:\npython -m spacy download {lang}'.format(lang=lang))
         self.logger = logging.getLogger(__name__)
-        download('stopwords', quiet=True)
-        download('words', quiet=True)
 
     def remove_duplicates(self):
         """Removes tweets with same ID"""
@@ -41,14 +38,13 @@ class CleanTweets():
         self.df['is_duplicate'] = is_duplicate
 
     def add_token_count(self):
-        tt = TweetTokenizer()
         text = self.df['text'].apply(str)
-        text = text.apply(lambda t: re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','<url>', t))
-        text = text.apply(lambda t: re.sub('(\@[^\s]+)','@<user>', t))
-        text = text.apply(tt.tokenize)
-        text = text.apply(lambda tokens: [t.lower() for t in tokens])
-        text = text.apply(lambda tokens: [w for w in list(tokens) if str(w) not in self.en_stopwords and str(w) in self.en_words])
-        self.df['token_count'] = text.apply(lambda t: len(t))
+        # remove user handles and URLs from text
+        text = text.apply(lambda t: re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))', '', t))
+        text = text.apply(lambda t: re.sub('(\@[^\s]+)', '', t))
+        text = text.apply(lambda t: self.nlp(t, disable=['parser', 'tagger', 'ner']))
+        # Count the number of tokens excluding stopwords
+        self.df['token_count'] = text.apply(lambda doc: len([token for token in doc if token.is_alpha and not token.is_stop]))
 
     def add_decision_flags(self, token_count_cutoff=3):
         """Add flags which have been pre-defined for later processing steps"""
@@ -63,14 +59,14 @@ class CleanTweets():
         self.logger.info('Writing file {}...'.format(path))
         self.df.to_csv(path, encoding='utf8')
 
-def run(dtypes=['original'], verbose=False):
+def run(dtypes=['original'], lang='en', verbose=False):
     s_time = time.time()
     logger = logging.getLogger(__name__)
     for dtype in dtypes:
         logger.info('Reading data of type {}...'.format(dtype))
         df = get_merged_data(dtype=dtype)
         num_tweets_with_duplicates = len(df)
-        clt = CleanTweets(df, verbose=verbose)
+        clt = CleanTweets(df, lang=lang, verbose=verbose)
         clt.remove_duplicates()
         num_tweets = len(df)
         if verbose:
