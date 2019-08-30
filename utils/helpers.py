@@ -278,10 +278,6 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
     else:
         usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at']
     df = get_cleaned_data(dtype=dtype, usecols=usecols)
-    if include_flags:
-        df_sampled = get_uploaded_batched_data(mode=mode)
-        df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
-        df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
     if include_predictions:
         df_pred = get_predicted_data(include_raw_data=False, dtype=dtype)
         df_pred.index = df.index
@@ -291,11 +287,15 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
         df = df[df.index >= s_date]
     if e_date != '':
         df = df[df.index <= e_date]
-    # compute filters for sampling data
-    df['S'] = df.id.isin(df_sampled.tweet_id)
-    # compute filters for annotation data
-    df['L'] = df.id.isin(df_labelled.tweet_id)
-    df['A'] = df.id.isin(df_cleaned_labels.id)
+    if include_flags:
+        df_sampled = get_uploaded_batched_data(mode=mode)
+        df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
+        df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
+        # compute filters for sampling data
+        df['S'] = df.id.isin(df_sampled.tweet_id)
+        # compute filters for annotation data
+        df['L'] = df.id.isin(df_labelled.tweet_id)
+        df['A'] = df.id.isin(df_cleaned_labels.id)
     return df
 
 def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, set_index='created_at'):
