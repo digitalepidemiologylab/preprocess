@@ -111,8 +111,15 @@ def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_id
             raise ValueError('Found {} different files for cleaned labels. Provide "name" argument to specify which.'.format(len(label_files)))
     else:
         f_path = os.path.join(find_folder('5_labels_cleaned'), '{}.csv'.format(name))
+        annotation_files = glob.glob(f_path)
     dtypes = {'id': str, 'question_id': 'Int64', 'answer_id': 'Int64'}
-    df = pd.read_csv(f_path, encoding='utf8', dtype=dtypes)
+    if len(annotation_files) == 1:
+        df = pd.read_csv(annotation_files[0], encoding='utf8', dtype=dtypes)
+    else:
+        df = pd.DataFrame()
+        for annotation_file in annotation_files:
+            df_annot = pd.read_csv(annotation_file, encoding='utf8', dtype=dtypes)
+            df = pd.concat([df, df_annot], axis=1)
     possible_question_tags = df.question_tag.unique()
     if has_label is not None and has_label != '':
         for _has_label in has_label.split(','):
@@ -256,19 +263,14 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=True, dtype='anonymized', token_count_cutoff=3, s_date='2013-01-01', e_date='2019-05-31', mode='mturk',
-        cleaned_labels_name_1='cleaned_labels_cutoff-worker-outliers-3.0_min-labels-cutoff-3_unanimous',
-        cleaned_labels_name_2='cleaned_labels_is-relevant_cutoff-worker-outliers-3.0_min-labels-cutoff-3_unanimous',
-        include_predictions=True):
+def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=True):
     """
-    Returns all data including predictions and filters
+    Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
     :param dtype: Raw data dtype (default: anonymized)
-    :param s_date: Start date filter
-    :param e_date: End date filter
-    :param token_count_cutoff: Word token cut-off (default: 3)
-    :param cleaned_labels_name_1: Cleaned label filter 1
-    :param cleaned_labels_name_2: Cleaned label filter 2
+    :param s_date: Start date filter (YYYY-MM-dd)
+    :param e_date: End date filter (YYYY-MM-dd)
+    :param include_flags: Include certain flags (S: used in sampling, L: labelled, A: cleaned labelled)
     """
     # load data
     if include_all_data:
@@ -276,30 +278,24 @@ def get_all_data(include_all_data=True, dtype='anonymized', token_count_cutoff=3
     else:
         usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at']
     df = get_cleaned_data(dtype=dtype, usecols=usecols)
-    df_sampled = get_uploaded_batched_data(mode=mode)
-    df_available = get_uploaded_batched_data(availability='available', mode=mode)
-    df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
-    df_cleaned_labels_1 = get_cleaned_labelled_data(name=cleaned_labels_name_1, cols=['id'])
-    df_cleaned_labels_2 = get_cleaned_labelled_data(name=cleaned_labels_name_2, cols=['id'])
+    if include_flags:
+        df_sampled = get_uploaded_batched_data(mode=mode)
+        df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
+        df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
     if include_predictions:
         df_pred = get_predicted_data(include_raw_data=False, dtype=dtype)
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1)
     # compute filters for raw data
-    df['d0'] = (df.contains_keywords) & (df.index >= s_date) & (df.index <= e_date)
-    df['d1'] = (df.d0) & (df.token_count >= token_count_cutoff)
-    df['d2'] = (df.d1) & (~df.is_retweet) & (~df.is_duplicate) & (~df.extracted_quoted_tweet)
+    if s_date != '':
+        df = df[df.index >= s_date]
+    if e_date != '':
+        df = df[df.index <= e_date]
     # compute filters for sampling data
-    df['s0'] = df.id.isin(df_sampled.tweet_id)
-    df['s1'] = (df.s0) & (df.id.isin(set(df_available['tweet_id'])))
+    df['S'] = df.id.isin(df_sampled.tweet_id)
     # compute filters for annotation data
-    df['a0'] = df.id.isin(df_labelled.tweet_id)
-    df['a1'] = df.id.isin(df_cleaned_labels_1.id)
-    df['a2'] = df.id.isin(df_cleaned_labels_2.id)
-    # compute filters for prediction data
-    if include_predictions:
-        df['p0'] = df.d1
-        df['p1'] = (df.p0) & (df.label_related == 'related')
+    df['L'] = df.id.isin(df_labelled.tweet_id)
+    df['A'] = df.id.isin(df_cleaned_labels.id)
     return df
 
 def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, set_index='created_at'):
@@ -412,13 +408,10 @@ def get_f_name(dtype, year, processing_step='merged', flag=None, contains_keywor
         f_name = '{}_{}_year_{}{}{}.csv'.format(processing_step, dtype, year, flag, contains_keywords_flag)
     return f_name
 
-def find_file(f_name, subfolder='1_merged', num_parent_dirs=4, cached=False):
-    data_folder = 'data'
-    for i in range(num_parent_dirs):
-        par_dirs = i*['..']
-        f_path = os.path.join(*par_dirs, data_folder, subfolder, f_name)
-        if os.path.isfile(f_path):
-            return f_path
+def find_file(f_name, subfolder='1_merged', cached=False):
+    f_path = os.path.join(find_folder(subfolder), f_name)
+    if os.path.isfile(f_path):
+        return f_path
     if not cached:
         raise FileNotFoundError('File {0} could not be found.'.format(f_name))
     else:
