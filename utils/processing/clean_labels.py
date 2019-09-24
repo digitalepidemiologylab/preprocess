@@ -5,7 +5,6 @@ from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-import seaborn as sb
 from utils.helpers import find_folder, get_labelled_data, get_merged_data
 from tqdm import tqdm
 import logging
@@ -350,6 +349,7 @@ class CleanLabels(object):
         return np.abs(x - x_median)/mad
 
     def plt_outliers(self):
+        import seaborn as sb
         fig, ax = plt.subplots(2, 1)
         dotsize = 2
         _ = sb.swarmplot(x='time_values', y=[""]*len(self.outliers), data=self.outliers, hue=self.outliers['time_outlier'], ax=ax[0], size=dotsize)
