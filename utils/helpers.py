@@ -67,7 +67,6 @@ def get_labelled_data(pattern='*', mode='*', usecols=None):
         raise FileNotFoundError('No annotation files could be found.')
     df = pd.DataFrame()
     # Make sure to keep id columns as pandas integer type Int64 which also allows for NaN values
-
     dtypes = {'tweet_id': str, 'question_id': 'Int64', 'answer_id': 'Int64', 'project_id': 'Int64', 'user_id': 'Int64'}
     for f_path in f_names:
         df = pd.concat([df, pd.read_csv(f_path, dtype=dtypes, usecols=usecols)], axis=0, ignore_index=True, sort=True)
@@ -302,6 +301,45 @@ def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, 
     def env_is_true(env_var):
         env_var = os.environ.get(env_var, '')
         return env_var == '1' or env_var.lower() == 'true'
+    dtypes = get_dtypes(usecols=usecols)
+    if parallel or env_is_true('PARALLEL'):
+        try:
+            import modin.pandas as pd
+        except:
+            # Fallback to normal pandas
+            import pandas as pd
+    else:
+        import pandas as pd
+    if not (isinstance(frac, int) or isinstance(frac, float)):
+        raise ValueError('Frac has to be of type integer or float')
+    if frac < 0 or frac > 1:
+        raise ValueError('Frac should be between 0 and 1')
+    if int(frac) == 1:
+        df = pd.read_csv(f_path, encoding='utf8', dtype=dtypes, usecols=usecols)
+    else:
+        # read only fraction of csv
+        with open(f_path, 'r') as csvfile:
+            num_rows = sum(1 for row in csvfile)
+            csvfile.seek(0)
+            break_at = int(frac * num_rows)
+            if break_at == 0: return pd.DataFrame()
+            df = ''
+            for i, line in enumerate(csvfile):
+                df += line
+                if i >= break_at:
+                    break
+        df = pd.read_csv(io.StringIO(df), dtype=dtypes, encoding='utf8', usecols=usecols)
+    if len(df) <= 1:
+        return df
+    if 'created_at' in df:
+        df['created_at'] = pd.to_datetime(df['created_at'].values, utc=True)
+    if set_index is not None and set_index in df:
+        df.set_index(set_index, drop=True, inplace=True)
+    return df
+
+
+def get_dtypes(usecols=None):
+    """Gets dtypes for columns"""
     dtypes = {
             'created_at': str,
             'contains_keywords': bool,
@@ -356,40 +394,7 @@ def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, 
             }
     if usecols is not None:
         dtypes = {i:v for i,v in dtypes.items() if i in usecols}
-    if parallel or env_is_true('PARALLEL'):
-        try:
-            import modin.pandas as pd
-        except:
-            # Fallback to normal pandas
-            import pandas as pd
-    else:
-        import pandas as pd
-    if not (isinstance(frac, int) or isinstance(frac, float)):
-        raise ValueError('Frac has to be of type integer or float')
-    if frac < 0 or frac > 1:
-        raise ValueError('Frac should be between 0 and 1')
-    if int(frac) == 1:
-        df = pd.read_csv(f_path, encoding='utf8', dtype=dtypes, usecols=usecols)
-    else:
-        # read only fraction of csv
-        with open(f_path, 'r') as csvfile:
-            num_rows = sum(1 for row in csvfile)
-            csvfile.seek(0)
-            break_at = int(frac * num_rows)
-            if break_at == 0: return pd.DataFrame()
-            df = ''
-            for i, line in enumerate(csvfile):
-                df += line
-                if i >= break_at:
-                    break
-        df = pd.read_csv(io.StringIO(df), dtype=dtypes, encoding='utf8', usecols=usecols)
-    if len(df) <= 1:
-        return df
-    if 'created_at' in df:
-        df['created_at'] = pd.to_datetime(df['created_at'].values, utc=True)
-    if set_index is not None and set_index in df:
-        df.set_index(set_index, drop=True, inplace=True)
-    return df
+    return dtypes
 
 def get_f_name(dtype, year, processing_step='merged', flag=None, contains_keywords=False):
     if flag is None:

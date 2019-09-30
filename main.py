@@ -71,9 +71,10 @@ class ArgParse(object):
         parser = ArgParseDefault(description='Clean preprocessed data to generate `data/2_cleaned`')
         parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['original', 'anonymized'], nargs='+', help='Data source type to use (can be original, anonymized or encrypted)')
         parser.add_argument('-l', '--lang', default='en_core_web_lg', required=False, help='Spacy language model. This is used for word tokenization count.')
+        parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
         parser.add_argument('--verbose', dest='verbose', action='store_true', help='Verbose output')
         args = parser.parse_args(sys.argv[2:])
-        clean_tweets.run(dtypes=args.dtypes, lang=args.lang, verbose=args.verbose)
+        clean_tweets.run(dtypes=args.dtypes, lang=args.lang, no_parallel=args.no_parallel, verbose=args.verbose)
 
     def sample(self):
         import utils.processing.sample_tweets as sample_tweets

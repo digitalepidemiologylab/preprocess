@@ -207,7 +207,7 @@ def run(dtype='anonymized', size=None, year=None, contains_keywords=False, mode=
     else:
         logger.info('Creating sample of size {:,} or bin size {:,}...'.format(size, bin_size))
     logger.info('Reading data of type "{}"...'.format(dtype))
-    df = get_cleaned_data(dtype=dtype, year=year, flag='use_for_labelling', contains_keywords=contains_keywords, usecols=['id', 'text', 'created_at', 'use_for_labelling', 'contains_keywords'])
+    df = get_cleaned_data(dtype=dtype, year=year, contains_keywords=contains_keywords, usecols=['id', 'text', 'created_at', 'use_for_labelling', 'contains_keywords'])
     df = df[min_date:max_date]
     generator = SampleGenerator(seed=seed)
     sample = pd.DataFrame()
