@@ -262,7 +262,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=True):
+def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
