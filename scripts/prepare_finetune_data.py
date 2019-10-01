@@ -25,7 +25,7 @@ def main():
 
     # write output file
     f_path = os.path.join(find_folder('2_cleaned'), 'cleaned_labels_finetune.csv')
-    print('Writing file {}...'.format(f_path))
+    print('Writing {:,} lines to file {}...'.format(len(df), f_path))
     df[['text']].to_csv(f_path, index=False)
 
 

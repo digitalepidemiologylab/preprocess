@@ -3,6 +3,8 @@ import sys
 import json
 from contextlib import contextmanager
 import numpy as np
+import hashlib
+import pandas as pd
 
 @contextmanager
 def suppress_stdout():
@@ -24,3 +26,6 @@ class JSONEncoder(json.JSONEncoder):
             return obj.tolist()
         else:
             return super(JSONEncoder, self).default(obj)
+
+def get_df_hash(df):
+    return hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
