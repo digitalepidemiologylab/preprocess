@@ -118,7 +118,7 @@ def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_id
         df = pd.DataFrame()
         for annotation_file in annotation_files:
             df_annot = pd.read_csv(annotation_file, encoding='utf8', dtype=dtypes)
-            df = pd.concat([df, df_annot], axis=1)
+            df = pd.concat([df, df_annot], axis=0)
     possible_question_tags = df.question_tag.unique()
     if has_label is not None and has_label != '':
         for _has_label in has_label.split(','):
