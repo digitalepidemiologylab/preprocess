@@ -36,17 +36,17 @@ def add_decision_flags(df, token_count_cutoff=3):
     return df
 
 def run_chunk(chunk, lang='en_core_web_lg'):
-    chunk['token_count'] = compute_token_count(chunk, lang)
-    chunk['text_hash'] = get_text_hashes(chunk)
-    return chunk
+    token_count = compute_token_count(chunk, lang)
+    text_hash = get_text_hashes(chunk)
+    return pd.DataFrame({'token_count': token_count, 'text_hash': text_hash})
 
-def read_chunk(path, chunksize=2**15):
-    dtypes = get_dtypes()
-    for text_chunk in pd.read_csv(path, dtype=dtypes, chunksize=chunksize):
-        yield text_chunk
+def read_chunk(path, usecols=['text'], chunksize=2**15):
+    dtypes = get_dtypes(usecols=usecols)
+    for chunk in pd.read_csv(path, usecols=usecols, dtype=dtypes, chunksize=chunksize):
+        yield chunk
 
 def load_in_parallel(dtype, lang, no_parallel=False):
-    """Loads data and computes new columns in parallel"""
+    """Loads data in chunks and computes new columns in parallel"""
     if no_parallel:
         num_cores = 1
     else:
@@ -68,7 +68,15 @@ def run(dtypes=['original'], lang='en_core_web_lg', no_parallel=False, verbose=F
     for dtype in dtypes:
         logger.info('Clean data of type {}...'.format(dtype))
         # compute stuff in parallel
-        df = load_in_parallel(dtype, lang, no_parallel=no_parallel)
+        logger.info('Compute token count...'.format(dtype))
+        df_new = load_in_parallel(dtype, lang, no_parallel=no_parallel)
+        # load actual data
+        logger.info('Load data...'.format(dtype))
+        df = get_merged_data(dtype=dtype)
+        df = df.reset_index()
+        df = pd.concat([df, df_new], axis=1)
+        df_new = None # release memory
+        df = df.set_index('created_at')
         # find duplicates
         df['is_duplicate'] = df.duplicated(subset='text_hash', keep='first')
         num_tweets = len(df)
@@ -88,7 +96,6 @@ def run(dtypes=['original'], lang='en_core_web_lg', no_parallel=False, verbose=F
         f_name = 'cleaned_{}.csv'.format(dtype)
         out_path = os.path.join('data', '2_cleaned', f_name)
         logger.info('Writing file {}...'.format(out_path))
-        df.set_index('created_at', inplace=True)
         df.to_csv(out_path, encoding='utf8')
     e_time = time.time()
     logger.info('... done after {:.1f} min'.format((e_time - s_time)/60.0))
