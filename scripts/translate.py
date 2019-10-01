@@ -60,7 +60,7 @@ class ArgParse(object):
         if not os.path.isdir(folder):
             os.makedirs(folder)
         f_path = os.path.join(folder, 'prepare_{}.csv'.format(get_df_hash(df)[:5]))
-        logger.info('Writing file {}...'.format(f_path))
+        logger.info('Writing {:,} records to file {}...'.format(len(df), f_path))
         df[['id', 'text']].to_csv(f_path, index=False)
 
     def translate(self):
@@ -86,7 +86,7 @@ class ArgParse(object):
         df_len = df.text.apply(len)
         costs = df_len.sum()/500 * 0.01
         logger.info('About to translate {:,} characters with an estimated cost of EUR {:.2f}.'.format(df_len.sum(), costs))
-        yes_no = input('Continue to translate?\n')
+        yes_no = input('Continue to translate? (yes/no)\n')
         if not (yes_no == 'y' or yes_no == 'yes'):
             logger.info('Aborting...')
             return
@@ -94,18 +94,19 @@ class ArgParse(object):
         # params
         base_url = 'https://api.deepl.com/v2/translate'
         other_params = {'auth_key': args.auth_key, 'target_lang': args.target, 'source_lang': args.source}
-        texts = []
-        df_tr = pd.DataFrame()
+        chunk_size = 20
         def chunks(total_len, n):
             for i in range(0, total_len, n):
-                yield i, i + n
+                yield i, i + n - 1
         df['translation'] = ''
-        for start, stop in chunks(len(df), 50):
+        for start, stop in tqdm(chunks(len(df), chunk_size), total=len(range(0, len(df), chunk_size))):
             texts = df.loc[start:stop, 'text'].tolist()
             res = requests.get(base_url, params={'text': texts, **other_params})
+            if not res.ok:
+                raise Exception('Unable to retrieve data from DeepL. Error status code {}... Aborting'.format(res.status_code))
             res = res.json()
             df_tr = pd.DataFrame(res['translations'])
-            df.loc[start:stop, 'translation'] = df_tr.loc[start:stop, 'text']
+            df.loc[start:stop, 'translation'] = df_tr['text'].values
         f_path = os.path.join(folder, 'translation_{}.csv'.format(get_df_hash(df)[:5]))
         print('Writing {:,} records to file {}...'.format(len(df), f_path))
         df.to_csv(f_path, index=False)
