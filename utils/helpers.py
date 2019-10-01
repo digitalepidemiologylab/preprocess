@@ -291,7 +291,7 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
         df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
         df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
         # compute filters for sampling data
-        df['S'] = df.id.isin(df_sampled.tweet_id)
+        df['S'] = df.id.isin(df_sampled)
         # compute filters for annotation data
         df['L'] = df.id.isin(df_labelled.tweet_id)
         df['A'] = df.id.isin(df_cleaned_labels.id)
