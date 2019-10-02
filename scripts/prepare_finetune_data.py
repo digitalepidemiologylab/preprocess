@@ -11,11 +11,14 @@ def main(dtype='anonymized'):
     This script creates a new file `data/2_cleaned/2_cleaned_finetune.csv` containing data to fine-tune a text classification model.
     It excludes training data and duplicates.
     """
+    # logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-5.5s] [%(name)-12.12s]: %(message)s')
+    logger = logging.getLogger(__name__)
+
     # load data
-    logger = getLogging(__name__)
     logger.info('Reading data...')
     df = get_all_data(dtype=dtype, include_flags=True, include_predictions=False)
-
+    
     # fine tune data should
     # - not contain any training data
     # - not be a text duplicate

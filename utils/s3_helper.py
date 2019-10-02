@@ -41,7 +41,7 @@ class S3Helper:
             total_files_synced = 0
             for i in range(last_n_days):
                 day = (today - timedelta(days=i)).strftime('%Y-%m-%d')
-                sync_prefixes.append('tweets/{}/{}'.format(project_name, day))
+                sync_prefixes.append('tweets/{}/{}/'.format(project_name, day))
             for key_prefix in sync_prefixes:
                 # Sync each day separately
                 _, num_files_synced = self.download_files(key_prefix, local_tweets_dir, local_files, parallel=True)
@@ -49,7 +49,7 @@ class S3Helper:
             if num_files_synced == 0:
                 self.logger.info('Nothing to sync - Everything up-to-date.')
         else:
-            key_prefix = 'tweets/{}'.format(project_name)
+            key_prefix = 'tweets/{}/'.format(project_name)
             remote_files, num_files_synced = self.download_files(key_prefix, local_tweets_dir, local_files, parallel=True)
             # remove old files
             num_files_removed = self.remove_old_files(remote_files=remote_files, local_files=local_files, local_dir=local_tweets_dir)
