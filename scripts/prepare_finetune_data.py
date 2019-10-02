@@ -25,7 +25,7 @@ def main(dtype='anonymized'):
     # - have min 3 tokens
     # - should not be a retweet
     logger.info('Filtering...')
-    df = df[(~df.A) & (~df.is_duplicate) & (df.token_count >= 3) & (~df.is_retweet)]
+    df = df[(~df.A) & (~df.is_duplicate) & (df.token_count >= 3) & (~df.is_retweet) & (df.contains_keywords)]
 
     # write output file
     f_path = os.path.join(find_folder('2_cleaned'), 'cleaned_{}_finetune.csv'.format(dtype))
