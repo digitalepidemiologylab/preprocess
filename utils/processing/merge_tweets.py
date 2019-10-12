@@ -50,6 +50,8 @@ class MergeTweet(object):
             return s
         # replace \t, \n and \r characters by a whitespace
         s = re.sub(self.control_char_regex, ' ', s)
+        # replace HTML codes for new line characters
+        s = s.replace('&#13;', '').replace('&#10;', '')
         # removes all other control characters and the NULL byte (which causes issues when parsing with pandas)
         return "".join(ch for ch in s if unicodedata.category(ch)[0]!="C")
 
@@ -59,6 +61,11 @@ class MergeTweet(object):
             return pd.to_datetime(self.tweet['created_at'])
         elif field == 'text':
             return self.html_parser.unescape(self.get_text())
+        elif field == 'retweet_count':
+            retweet_count = str(self.tweet['retweet_count'])
+            if retweet_count.endswith('+'):
+                retweet_count = retweet_count[:-1]
+            return int(retweet_count)
         elif field in ['id', 'in_reply_to_status_id', 'in_reply_to_user_id']:
             try:
                 return self.tweet[field + '_str']
@@ -160,6 +167,12 @@ class MergeTweet(object):
                 if field == 'retweeted_status.favorite_count':
                     if 'favorite_count' in self.tweet['retweeted_status']:
                         retweet_info[field] = self._extract_subfield(field)
+                elif field == 'retweeted_status.retweet_count':
+                    if 'retweet_count' in self.tweet['retweeted_status']:
+                        retweet_count = str(self._extract_subfield(field))
+                        if retweet_count.endswith('+'):
+                            retweet_count = retweet_count[:-1]
+                        retweet_info[field] = int(retweet_count)
                 else:
                     retweet_info[field] = self._extract_subfield(field)
         return retweet_info

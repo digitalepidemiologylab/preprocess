@@ -13,7 +13,7 @@ import hashlib
 
 
 def get_text_hashes(chunk):
-    hashes = chunk['text'].apply(lambda s: hashlib.md5(s.encode('utf-8')).hexdigest())
+    hashes = chunk['text'].apply(lambda s: hashlib.md5(str(s).encode('utf-8')).hexdigest())
     return hashes
 
 def compute_token_count(chunk, lang):

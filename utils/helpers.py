@@ -11,7 +11,7 @@ import logging
 import re
 
 
-def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None):
+def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None, **args):
     """Read raw data
     :param dtype: possible values: "original", "anonymized", "encrypted"
     :param year: Read data of a certain year
@@ -20,7 +20,7 @@ def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None):
     """
     f_name = get_f_name(dtype, year, processing_step='merged')
     f_path = find_file(f_name, subfolder='1_merged')
-    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols)
+    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, **args)
 
 def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=False, flag=None, usecols=None):
     """Read cleaned data
@@ -297,7 +297,7 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
         df['A'] = df.id.isin(df_cleaned_labels.id)
     return df
 
-def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, set_index='created_at'):
+def read_raw_data_from_csv(f_path, dtype, frac=1, nrows=None, skiprows=None, usecols=None, parallel=False, set_index='created_at'):
     def env_is_true(env_var):
         env_var = os.environ.get(env_var, '')
         return env_var == '1' or env_var.lower() == 'true'
@@ -314,22 +314,16 @@ def read_raw_data_from_csv(f_path, dtype, frac=1, usecols=None, parallel=False, 
         raise ValueError('Frac has to be of type integer or float')
     if frac < 0 or frac > 1:
         raise ValueError('Frac should be between 0 and 1')
-    if int(frac) == 1:
+    if int(frac) == 1 and nrows is None and skiprows is None:
         df = pd.read_csv(f_path, encoding='utf8', dtype=dtypes, usecols=usecols)
     else:
         # read only fraction of csv
-        with open(f_path, 'r') as csvfile:
-            num_rows = sum(1 for row in csvfile)
-            csvfile.seek(0)
-            break_at = int(frac * num_rows)
-            if break_at == 0: return pd.DataFrame()
-            df = ''
-            for i, line in enumerate(csvfile):
-                df += line
-                if i >= break_at:
-                    break
-        df = pd.read_csv(io.StringIO(df), dtype=dtypes, encoding='utf8', usecols=usecols)
-    if len(df) <= 1:
+        if nrows is None:
+            with open(f_path, 'r') as csvfile:
+                total_rows = sum(1 for row in csvfile)
+            nrows = int(frac*total_rows)
+        df = pd.read_csv(f_path, dtype=dtypes, encoding='utf8', usecols=usecols, nrows=nrows, skiprows=skiprows)
+    if len(df) == 0:
         return df
     if 'created_at' in df:
         df['created_at'] = pd.to_datetime(df['created_at'].values, utc=True)
@@ -360,6 +354,8 @@ def get_dtypes(usecols=None):
             'longitude': 'float',
             'media': str,
             'place.bounding_box': str,
+            'place.bounding_box.area': float,
+            'place.bounding_box.centroid': str,
             'place.country_code': str,
             'place.full_name': str,
             'place.place_type': str,
@@ -368,7 +364,7 @@ def get_dtypes(usecols=None):
             'quoted_status.id': str,
             'quoted_status.in_reply_to_status_id': str,
             'quoted_status.media': str,
-            'quoted_status.retweet_count': 'float',
+            'quoted_status.retweet_count': 'Int64',
             'quoted_status.text': str,
             'quoted_status.user.followers_count': 'Int64',
             'quoted_status.user.id': str,
