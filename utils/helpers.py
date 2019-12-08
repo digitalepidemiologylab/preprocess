@@ -50,7 +50,7 @@ def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=Fa
             return df
     else:
         f_path = find_file(f_name, subfolder='2_cleaned')
-    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols)
+    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, nrows=nrows)
 
 def get_labelled_data(pattern='*', mode='*', usecols=None):
     """Read labelled data
@@ -216,7 +216,7 @@ def get_checked_tweets(mode='*', availability='*', df=None):
         df_checked.set_index('created_at', inplace=True)
     return df_checked
 
-def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, drop_retweets=False, usecols=None):
+def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, drop_retweets=False, usecols=None, nrows=None):
     """
     Return prediction data. Prediction data should be in `data/6_predicted`. All file names should have the following pattern: `predicted_{column_name}_{YYY}-{MM}-{dd}_{5-char-hash}.csv`.
     The column name can be an arbitrary tag (e.g. question tag) which should be unique.
@@ -243,14 +243,14 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
             # simple use prefix of filename
             df_column_names[f_name] = basename[len('predicted_'):-len('.csv')]
     for f_name in f_names:
-        df = pd.read_csv(f_name)
+        df = pd.read_csv(f_name, nrows=nrows)
         column_rename = {}
         for c in ['label', 'probability', 'labels', 'probabilities']:
             column_rename[c] = '{}_{}'.format(c, df_column_names[f_name])
         df.rename(columns=column_rename, inplace=True)
         df_pred = pd.concat([df_pred, df], axis=1)
     if include_raw_data:
-        df = get_cleaned_data(dtype=dtype, usecols=usecols)
+        df = get_cleaned_data(dtype=dtype, usecols=usecols, nrows=nrows)
         assert len(df) == len(df_pred), 'Length of prediction and raw data are not equal'
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1, sort=True)
@@ -262,7 +262,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False):
+def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
@@ -276,9 +276,9 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
         usecols = None
     else:
         usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at']
-    df = get_cleaned_data(dtype=dtype, usecols=usecols)
+    df = get_cleaned_data(dtype=dtype, usecols=usecols, nrows=nrows)
     if include_predictions:
-        df_pred = get_predicted_data(include_raw_data=False, dtype=dtype)
+        df_pred = get_predicted_data(include_raw_data=False, dtype=dtype, nrows=nrows)
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1)
     # compute filters for raw data
