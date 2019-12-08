@@ -22,7 +22,7 @@ def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None, **args)
     f_path = find_file(f_name, subfolder='1_merged')
     return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, **args)
 
-def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=False, flag=None, usecols=None):
+def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
     """Read cleaned data
     :param dtype: possible values: "original", "anonymized", "encrypted"
     :param year: Year is not used anymore
@@ -39,7 +39,7 @@ def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=Fa
             # No cached file found, read full file
             f_name_full = get_f_name(dtype, year, processing_step='cleaned')
             f_path_full = find_file(f_name_full, subfolder='2_cleaned')
-            df = read_raw_data_from_csv(f_path_full, dtype, frac=frac, usecols=usecols)
+            df = read_raw_data_from_csv(f_path_full, dtype, frac=frac, usecols=usecols, nrows=nrows)
             if flag is not None:
                 df = df[df[flag]]
             if contains_keywords:
