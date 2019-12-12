@@ -10,6 +10,8 @@ import csv
 import logging
 import re
 
+log = logging.getLogger(__name__)
+
 
 def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None, **args):
     """Read raw data
@@ -262,7 +264,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None):
+def get_all_data(include_all_data=False, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
@@ -270,12 +272,19 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
     :param s_date: Start date filter (YYYY-MM-dd)
     :param e_date: End date filter (YYYY-MM-dd)
     :param include_flags: Include certain flags (S: used in sampling, L: labelled, A: cleaned labelled)
+    :param mode: Annotation mode (*/mturk/local/public/other). Only relevant when include_flags set to true
+    :param include_predictions: Include all model predictions 
+    :param geo_enrichment_type: Can be None (do not include any enrichment data) or 'all'. If set, will include inferred geo data
     """
     # load data
     if include_all_data:
         usecols = None
     else:
+        # default columns
         usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at']
+        if extra_cols is not None:
+            for ec in extra_cols:
+                usecols.append(ec)
     df = get_cleaned_data(dtype=dtype, usecols=usecols, nrows=nrows)
     if include_predictions:
         df_pred = get_predicted_data(include_raw_data=False, dtype=dtype, nrows=nrows)
@@ -295,6 +304,12 @@ def get_all_data(include_all_data=True, dtype='anonymized', s_date='', e_date=''
         # compute filters for annotation data
         df['L'] = df.id.isin(df_labelled.tweet_id)
         df['A'] = df.id.isin(df_cleaned_labels.id)
+    if geo_enrichment_type is not None:
+        cache_path = get_cache_path(f'geonames_enriched_{dtype}.pkl')
+        df_geo = pd.read_pickle(cache_path)
+        df = df.reset_index()
+        df = pd.concat([df, df_geo], axis=1)
+        df = df.set_index('created_at')
     return df
 
 def read_raw_data_from_csv(f_path, dtype, frac=1, nrows=None, skiprows=None, usecols=None, parallel=False, set_index='created_at'):
@@ -453,3 +468,25 @@ def find_project_root(num_par_dirs=8):
     else:
         raise FileNotFoundError('Could not find project root folder.')
     return os.path.join(*os.path.split(current_dir)[:-1])
+
+def cache_folder(subfolder=None):
+    current_folder = os.path.dirname(os.path.realpath(__file__))
+    if subfolder is None:
+        f_path = os.path.join(current_folder, '..', 'data', 'cache')
+    else:
+        f_path = os.path.join(current_folder, '..', 'data', 'cache', subfolder)
+    if not os.path.isdir(f_path):
+        os.makedirs(f_path)
+    return os.path.abspath(f_path)
+
+def get_cache_path(f_name, subfolder=None):
+    f_path = os.path.join(cache_folder(subfolder=subfolder), f_name)
+    return os.path.abspath(f_path)
+
+def get_data_folder():
+    current_folder = os.path.dirname(os.path.realpath(__file__))
+    f_path = os.path.join(current_folder, '..', 'data')
+    if os.path.isdir(f_path):
+        return os.path.abspath(f_path)
+    else:
+        raise FileNotFoundError('Folder {0} could not be found.'.format(folder_path))
