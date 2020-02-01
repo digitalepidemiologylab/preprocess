@@ -61,9 +61,9 @@ def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', bala
         if len(has_label) > 0:
             has_label_flag = 'has_label_{}'.format(has_label.replace('|', '_or_').replace(',', '_and_'))
             flags += '_' + has_label_flag
-            folder_path = os.path.join(find_folder('5_labels_cleaned'), 'other', has_label_flag, question)
+            folder_path = os.path.join(find_folder('4_labels_cleaned'), 'other', has_label_flag, question)
         else:
-            folder_path = os.path.join(find_folder('5_labels_cleaned'), 'splits', question)
+            folder_path = os.path.join(find_folder('4_labels_cleaned'), 'splits', question)
         train, test = sklearn.model_selection.train_test_split(df, test_size=test_size, random_state=seed, shuffle=True)
         if not os.path.isdir(folder_path):
             os.makedirs(folder_path)

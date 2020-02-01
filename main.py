@@ -7,11 +7,10 @@ python main.py <command> [<args>]
 
 Available commands:
   init             Initialize project
-  merge            Preprocessing of data to generate `/data/1_merged`
-  clean            Clean preprocessed data to generate `data/2_cleaned`
-  sample           Sample cleaned data to generate `data/3_cleaned`
-  batch            Creates a new batch of tweets from a sampled file in `/data/3_sampled`
-  clean_labels     Clean labels generated from Mturk (`data/4_labelled`) and merge/clean to generate `/data/5_cleaned_labels`
+  parse            Preprocessing of data to generate `/data/1_parsed`
+  sample           Sample cleaned data to generate `data/2_sampled`
+  batch            Creates a new batch of tweets from a sampled file in `/data/2_sampled`
+  clean_labels     Clean labels generated from Mturk (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
   split            Splits data into training and test data
   sync             Sync project data from S3
@@ -56,33 +55,26 @@ class ArgParse(object):
         args = parser.parse_args(sys.argv[2:])
         init(args.project, args.template)
 
-    def merge(self):
-        import utils.processing.merge_tweets as merge_tweets
-        parser = ArgParseDefault(description='Preprocess raw data to create `data/1_merged`')
-        parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['original', 'anonymized'], nargs='+', help='Data source type to create (can be original, anonymized or encrypted)')
-        parser.add_argument('--yearly', dest='yearly', action='store_true', default=False, help='Create yearly interval output')
+    def parse(self):
+        import utils.processing.parse_tweets as parse_tweets
+        parser = ArgParseDefault(description='Preprocess raw data to create `data/1_parsed`')
+        parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['anonymized'], nargs='+', help='Data source type to create. Anonymized replaces user mentions and URLs. Encrypted will encrypt certain fields (needs encryption key).')
+        parser.add_argument('-f', '--formats', dest='formats', nargs='+', choices=['pkl', 'csv', 'json'], default=['pkl', 'csv'], help='Output formats')
+        parser.add_argument('-l', '--lang', default='en_core_web_sm', required=False, help='Spacy language model. This is used for word tokenization count.')
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
+        parser.add_argument('--extend', dest='extend', action='store_true', help='Do extend existing parsed data. Extend requires a pickle file to work properly.')
+        parser.add_argument('--overwrite', dest='overwrite', action='store_true', help='Overwrite existing files')
         parser.add_argument('--verbose', dest='verbose', action='store_true', help='Verbose output')
         args = parser.parse_args(sys.argv[2:])
-        merge_tweets.run(dtypes=args.dtypes, no_parallel=args.no_parallel, yearly=args.yearly, verbose=args.verbose)
-
-    def clean(self):
-        import utils.processing.clean_tweets as clean_tweets
-        parser = ArgParseDefault(description='Clean preprocessed data to generate `data/2_cleaned`')
-        parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['original', 'anonymized'], nargs='+', help='Data source type to use (can be original, anonymized or encrypted)')
-        parser.add_argument('-l', '--lang', default='en_core_web_lg', required=False, help='Spacy language model. This is used for word tokenization count.')
-        parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='Verbose output')
-        args = parser.parse_args(sys.argv[2:])
-        clean_tweets.run(dtypes=args.dtypes, lang=args.lang, no_parallel=args.no_parallel, verbose=args.verbose)
+        parse_tweets.run(dtypes=args.dtypes, formats=args.formats, lang=args.lang, no_parallel=args.no_parallel, overwrite=args.overwrite, extend=args.extend, verbose=args.verbose)
 
     def sample(self):
         import utils.processing.sample_tweets as sample_tweets
-        parser = ArgParseDefault(description='Sample cleaned data to generate `data/3_cleaned`')
-        parser.add_argument('-s', '--size', type=int, required=False, dest='size', help='Number of tweets to sample')
+        parser = ArgParseDefault(description='Sample cleaned data to generate `data/2_sampled`')
+        parser.add_argument('-s', '--size', type=int, required=True, dest='size', help='Number of tweets to sample')
         parser.add_argument('-bs', '--bin-size', type=int, required=False, dest='bin_size', help='Number of tweets per bin')
         parser.add_argument('-d', '--dtype', type=str, required=False, dest='dtype', default='anonymized', nargs='?', help='Data source type to use (can be original, anonymous or encrypted)')
-        parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='monthly', help='Sampling mode. Monthly: Try to sample evenly within months. Random: Sample randomly.')
+        parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='random', help='Sampling mode. Random: Sample randomly. Monthly: Try to sample evenly within months.')
         parser.add_argument('--contains-keywords', dest='contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords')
         parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split')
         parser.add_argument('--extend', action='store_true', help='Extending existing sample given by seed by removing already labelled tweets. If size is <= original sample size this has no effect except removing labelled tweets');
@@ -93,7 +85,7 @@ class ArgParse(object):
 
     def batch(self):
         from utils.processing.sample_tweets import SampleGenerator
-        parser = ArgParseDefault(description='Generate new batch for labelling. As a result a new csv will be created in `data/3_sampled/batch_{batch_id}/`')
+        parser = ArgParseDefault(description='Generate new batch for labelling. As a result a new csv will be created in `data/2_sampled/batch_{batch_id}/`')
         parser.add_argument('-N', '--num_tweets', type=int, default=None, help='The number of tweets to be generated in new batch')
         parser.add_argument('-b', '--batch', type=int, default=None, help='The batch id to be generated, default: Automatically find next batch')
         parser.add_argument('--ignore-previous', dest='ignore_previous', action='store_true', default=False, help='Also sample tweets from old batches which were not annotated')

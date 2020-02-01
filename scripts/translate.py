@@ -4,7 +4,7 @@ import sys, os
 import requests
 import pandas as pd
 sys.path.append('..')
-from utils.helpers import get_cleaned_data, find_folder
+from utils.helpers import get_parsed_data, find_folder
 from utils.misc import get_df_hash
 import glob
 from tqdm import tqdm
@@ -47,7 +47,7 @@ class ArgParse(object):
         args = parser.parse_args(sys.argv[2:])
         # load data
         logger.info('Loading data...')
-        df = get_cleaned_data(dtype=args.dtype, usecols=['id', 'text', 'is_duplicate', 'has_place', 'has_coordinates', 'is_retweet'])
+        df = get_parsed_data(dtype=args.dtype, usecols=['id', 'text', 'is_duplicate', 'has_place', 'has_coordinates', 'is_retweet'])
         # filter
         if args.geo_only:
             df = df[(df.has_place | df.has_coordinates) & (~df.is_duplicate) & (~df.is_retweet)]

@@ -1,4 +1,3 @@
-import math
 import re
 import pandas as pd
 import os
@@ -7,7 +6,6 @@ from collections import defaultdict
 from html.parser import HTMLParser
 from utils.processing.encrypt import Encrypt
 import glob
-import re
 import ast
 import time
 import json
@@ -17,12 +15,15 @@ from munch import DefaultMunch
 import multiprocessing
 import joblib
 import itertools
-import warnings
 import utils.helpers
 import logging
 import shapely.geometry
+import pickle
+import spacy
+import hashlib
+import random
 
-class MergeTweet(object):
+class ParseTweet():
     """Wrapper class for functions to process/modify tweets"""
 
     def __init__(self, tweet=None):
@@ -281,6 +282,20 @@ class MergeTweet(object):
                 return True
         return False
 
+    def get_token_count(self, nlp):
+        text = self.get_text()
+        # remove user handles and URLs from text
+        text = re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))', '', text)
+        text = re.sub('(\@[^\s]+)', '', text)
+        text = text.strip()
+        doc = nlp(text, disable=['parser', 'tagger', 'ner'])
+        # Count the number of tokens excluding stopwords
+        token_count = len([token for token in doc if token.is_alpha and not token.is_stop])
+        return token_count
+
+    def get_text_hash(self):
+        return hashlib.md5(self.get_text().encode('utf-8')).hexdigest()
+
     # private methods
 
     def _fetch_urls(self):
@@ -360,6 +375,8 @@ def process_file(f_name, config):
     count = 0
     if config.output_types.encrypted:
         encrypt = Encrypt()
+    # load spacy model
+    nlp = spacy.load(config.lang)
     with open(f_name, 'r') as f:
         num_lines = sum(1 for line in f)
         f.seek(0)
@@ -373,7 +390,7 @@ def process_file(f_name, config):
                 tweet = ast.literal_eval(line)
             if 'info' in tweet:
                 continue  # API log fields (can be ignored)
-            pt = MergeTweet(tweet)
+            pt = ParseTweet(tweet=tweet)
             tweet_obj = {
                     **pt.get_fields(config.keep_fields),
                     **pt.get_user_fields(config.keep_fields_user),
@@ -384,7 +401,9 @@ def process_file(f_name, config):
                     **pt.get_quoted_status_info(config.keep_fields_quoted_status),
                     **pt.get_media_info(),
                     'extracted_quoted_tweet': False,
-                    'contains_keywords': pt.contains_keywords(config.keywords)
+                    'contains_keywords': pt.contains_keywords(config.keywords),
+                    'token_count': pt.get_token_count(nlp),
+                    'text_hash': pt.get_text_hash()
                     }
             if config.output_types.original:
                 all_data['original'].append(tweet_obj)
@@ -398,7 +417,7 @@ def process_file(f_name, config):
             count +=1
             # append quoted tweet as normal tweet
             if tweet_obj['has_quoted_status']:
-                pt = MergeTweet(tweet['quoted_status'])
+                pt = ParseTweet(tweet=tweet['quoted_status'])
                 tweet_obj = {
                         **pt.get_fields(config.keep_fields),
                         **pt.get_user_fields(config.keep_fields_user),
@@ -409,7 +428,9 @@ def process_file(f_name, config):
                         **pt.get_quoted_status_info(config.keep_fields_quoted_status),
                         **pt.get_media_info(),
                         'extracted_quoted_tweet': True,
-                        'contains_keywords': pt.contains_keywords(config.keywords)
+                        'contains_keywords': pt.contains_keywords(config.keywords),
+                        'token_count': pt.get_token_count(nlp),
+                        'text_hash': pt.get_text_hash()
                         }
                 if config.output_types.original:
                     all_data['original'].append(tweet_obj)
@@ -423,13 +444,14 @@ def process_file(f_name, config):
                 count +=1
     return all_data
     
-
-def run(dtypes=['original'], yearly=True, no_parallel=False, verbose=False):
+def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, verbose=False):
+    # setup
+    s_time = time.time()
     logger = logging.getLogger(__name__)
     # build config
     config = DefaultMunch(None)
     config.input_data_path = os.path.join('data', '0_raw')
-    config.output_data_path = os.path.join('data', '1_merged')
+    config.output_data_path = os.path.join('data', '1_parsed')
     # fields to keep
     config.keep_fields = ['id', 'created_at', 'text', 'in_reply_to_status_id', 'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count']
     config.keep_fields_user = ['id', 'screen_name', 'name', 'location', 'followers_count', 'friends_count']
@@ -443,9 +465,9 @@ def run(dtypes=['original'], yearly=True, no_parallel=False, verbose=False):
                       'quoted_status.id': str, 'quoted_status.user.id': str, 'quoted_status.in_reply_to_status_id': str}, None)
     project_info = utils.helpers.get_project_info()
     config.keywords = project_info['keywords']
+    config.lang = lang
     # params
     config.output_types = DefaultMunch.fromDict({dtype: True for dtype in dtypes}, False)
-    config.output_intervals = DefaultMunch.fromDict({'all': True, 'yearly': yearly}, False)
     # make sure encryption key is set
     if config.output_types.encrypted:
         Encrypt.verify_encryption_key()
@@ -454,34 +476,120 @@ def run(dtypes=['original'], yearly=True, no_parallel=False, verbose=False):
         num_cores = 1
     else:
         num_cores = max(multiprocessing.cpu_count() - 1, 1)
-    s_time = time.time()
+    # check for overwrite
+    if not overwrite and not extend:
+        for t in config.output_types:
+            for fmt in formats:
+                f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
+                if os.path.isfile(f_name):
+                    raise Exception(f'File {f_name} already exists! Provide --overwrite flag or --extend flag (or remove file)')
     parallel = joblib.Parallel(n_jobs=num_cores)
     process_file_delayed = joblib.delayed(process_file)
-    data_files = sorted([f for f in glob.glob(os.path.join(config.input_data_path, '**', '*.json*'), recursive=True) if os.path.isfile(f)])
-    all_data = parallel((process_file_delayed(f_name, config) for f_name in tqdm(data_files)))
-    # merge
+    all_data_files = sorted([f for f in glob.glob(os.path.join(config.input_data_path, '**', '*.json*'), recursive=True) if os.path.isfile(f)])
+    data_files = all_data_files
+    # extend
+    f_name_used_files = os.path.join(config.output_data_path, '.processed_data_files.pkl')
+    if extend:
+        # check for old file to extend
+        for t in config.output_types:
+            f_name = os.path.join(config.output_data_path, f'parsed_{t}.pkl')
+            if not os.path.isfile(f_name):
+                raise Exception(f'Could not find a pickle file {f_name}. Remove the --extend flag in order to run.')
+        # check for file that contains list of file names used
+        if os.path.isfile(f_name_used_files):
+            with open(f_name_used_files, 'rb') as f:
+                used_files = pickle.load(f)
+            data_files = list(set(all_data_files) - set(used_files))
+            if len(data_files) == 0:
+                logger.info('Files are up-to-date.')
+                return
+        else:
+            logger.warn(f"Couldn't find file {f_name_used_files}. Will compute everything from scratch.")
+    # create batches of file names and process in parallel
+    logger.info('Running jobs...')
+    random.shuffle(data_files)
+    all_data = parallel((process_file_delayed(data_file, config) for data_file in tqdm(data_files)))
+    # parse
+    logger.info('Merging data...')
     all_data = {dtype: list(itertools.chain.from_iterable([d[dtype] for d in all_data])) for dtype in config.output_types}
-    data_size = set()
+
+    def read_df(f_name, fmt=None):
+        logger.info(f'Reading {f_name}...')
+        if fmt is None:
+            fmt = f_name.split('.')[-1]
+        if fmt == 'pkl':
+            _df = pd.read_pickle(f_name)
+        elif fmt == 'csv':
+            _df = pd.read_csv(f_name)
+        elif fmt == 'json':
+            _df = pd.read_json(f_name)
+        else:
+            raise ValueError(f'Format {fmt} is not supported')
+        return _df
+
+    def write_df(_df, f_name, fmt=None):
+        if os.path.isfile(f_name) and extend:
+            # take existing data and concatenate new
+            f_name_pre = '.'.join(f_name.split('.')[:-1]) + '.pkl'
+            if not os.path.isfile(f_name_pre):
+                raise Exception(f'Could not find file {f_name_pre} to extend')
+            logger.info(f'Appending to content in {f_name_pre}...')
+            _df_pre = read_df(f_name_pre, fmt='pkl')
+            _df = pd.concat([_df_pre, _df], axis=0, sort=True)
+        logger.info(f'Writing {f_name}...')
+        if fmt is None:
+            fmt = f_name.split('.')[-1]
+        if fmt == 'pkl':
+            _df = _df.to_pickle(f_name)
+        elif fmt == 'csv':
+            _df = _df.to_csv(f_name, index=False)
+        elif fmt == 'json':
+            _df = _df.to_json(f_name)
+        else:
+            raise ValueError(f'Format {fmt} is not supported')
+
+    def add_decision_flags(df, token_count_cutoff=3):
+        """Add flags which have been pre-defined for later processing steps"""
+        # labelling: no retweets, no extracted tweets, no duplicates, min token count
+        df['use_for_labelling'] = (~df['is_retweet']) & (~df['extracted_quoted_tweet']) & (~df['is_duplicate']) & (df['token_count'] >= token_count_cutoff)
+        # prediction: min token count
+        df['use_for_prediction'] = df['token_count'] >= token_count_cutoff
+        return df
+
+    def report_counts(stats):
+        total_size = set([stats[t]['final_counts'] for t, vals in stats.items()])
+        if len(total_size) > 1:
+            logger.warn('Collected datatypes are of different sizes. This should normally not happen.')
+        for t, vals in stats.items():
+            logger.info(f'Stats for dtype {t}:')
+            for k, v in vals.items():
+                logger.info(f'- {k}: {v:,}')
+
     # write output files
+    stats = defaultdict(dict)
     for t in config.output_types:
         if config.output_types[t]:
             df = pd.DataFrame(all_data[t])
+            stats[t]['original_counts'] = len(df)
             # Drop dulicates by ID
             df.drop_duplicates(subset='id', keep='first', inplace=True)
+            stats[t]['final_counts'] = len(df)
             logger.info('Writing data of type {} ...'.format(t))
             df['created_at'] = pd.to_datetime(df['created_at'])
             df.sort_values('created_at', inplace=True)
             df.set_index('created_at', inplace=True, drop=False)
-            data_size.add(len(df))
-            if config.output_intervals.all:
-                df.to_csv(os.path.join(config.output_data_path, 'merged_{}.csv'.format(t)), index=False, encoding='utf8') 
-            if config.output_intervals.yearly:
-                date_ranges = [['{}-01-01'.format(y), '{}-12-31'.format(y), y] for y in range(2000, 2040)]
-                for date_range in date_ranges:
-                    if len(df[date_range[0]:date_range[1]]) > 0:
-                        df[date_range[0]:date_range[1]].to_csv(os.path.join(config.output_data_path, 'merged_{}_year_{}.csv'.format(t, date_range[2])), index=False, encoding='utf8')   
+            # find text duplicates
+            df['is_duplicate'] = df.duplicated(subset='text_hash', keep='first')
+            stats[t]['num_text_duplicates'] = len(df[df['is_duplicate']])
+            df = add_decision_flags(df)
+            stats[t]['num_use_for_labelling'] = len(df[df['use_for_labelling']])
+            stats[t]['num_use_for_prediction'] = len(df[df['use_for_prediction']])
+            for fmt in formats:
+                f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
+                write_df(df, f_name, fmt=fmt)
     e_time = time.time()
-    if len(data_size) > 1:
-        warnings.warn('Collected datatypes are of different sizes. This should normally not happen.')
-    data_size = data_size.pop()
-    logger.info('Merged {:,} tweets after {:.1f} min'.format(data_size, (e_time - s_time)/60.0))
+    report_counts(stats)
+    logger.info('Finished after {:.1f} min'.format((e_time - s_time)/60.0))
+    # write info file for which files were used
+    with open(f_name_used_files, 'wb') as f:
+        pickle.dump(all_data_files, f)

@@ -13,34 +13,22 @@ import re
 log = logging.getLogger(__name__)
 
 
-def get_merged_data(dtype='original', year=None, frac=1.0, usecols=None, **args):
-    """Read raw data
+def get_parsed_data(dtype='original', frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
+    """Read parsed data
     :param dtype: possible values: "original", "anonymized", "encrypted"
-    :param year: Read data of a certain year
-    :param frac: fraction of data to be read (default 1)
-    :param usecols: List of columns to read from
-    """
-    f_name = get_f_name(dtype, year, processing_step='merged')
-    f_path = find_file(f_name, subfolder='1_merged')
-    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, **args)
-
-def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
-    """Read cleaned data
-    :param dtype: possible values: "original", "anonymized", "encrypted"
-    :param year: Year is not used anymore
     :param frac: fraction of data to be read (default 1)
     :param contains_keywords: Only get data where contains_keywords is True (default: False)
     :param flag: Can be None, 'use_for_prediction', 'use_for_labelling'. None gives all data, use_for_prediction/labelling gives corresponding
     labelled subset. The first time used, the subset will be cached for subsequent use.
     :param usecols: Only extract certain columns (default: all columns)
     """
-    f_name = get_f_name(dtype, year, processing_step='cleaned', flag=flag, contains_keywords=contains_keywords)
+    f_name = get_f_name(dtype, processing_step='parsed', flag=flag, contains_keywords=contains_keywords)
     if flag is not None or contains_keywords:
-        f_path = find_file(f_name, subfolder='2_cleaned', cached=True)
+        f_path = find_file(f_name, subfolder='1_parsed', cached=True)
         if f_path == '':
             # No cached file found, read full file
-            f_name_full = get_f_name(dtype, year, processing_step='cleaned')
-            f_path_full = find_file(f_name_full, subfolder='2_cleaned')
+            f_name_full = get_f_name(dtype, processing_step='parsed')
+            f_path_full = find_file(f_name_full, subfolder='1_parsed')
             df = read_raw_data_from_csv(f_path_full, dtype, frac=frac, usecols=usecols, nrows=nrows)
             if flag is not None:
                 df = df[df[flag]]
@@ -51,7 +39,7 @@ def get_cleaned_data(dtype='original', year=None, frac=1.0, contains_keywords=Fa
             df.to_csv(path, encoding='utf8')
             return df
     else:
-        f_path = find_file(f_name, subfolder='2_cleaned')
+        f_path = find_file(f_name, subfolder='1_parsed')
     return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, nrows=nrows)
 
 def get_labelled_data(pattern='*', mode='*', usecols=None):
@@ -64,7 +52,7 @@ def get_labelled_data(pattern='*', mode='*', usecols=None):
         raise ValueError('Mode argument has to be one of: {}'.format(', '.join(accepted_modes)))
     if mode == 'all':
         mode = '*'
-    f_names = glob.glob(os.path.join(find_folder('4_labelled'), mode, '*{}*.csv'.format(pattern)))
+    f_names = glob.glob(os.path.join(find_folder('3_labelled'), mode, '*{}*.csv'.format(pattern)))
     if len(f_names) == 0:
         raise FileNotFoundError('No annotation files could be found.')
     df = pd.DataFrame()
@@ -102,7 +90,7 @@ def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_id
     """
     logger = logging.getLogger(__name__)
     if name == '':
-        f_path = os.path.join(find_folder('5_labels_cleaned'), 'cleaned_labels*.csv')
+        f_path = os.path.join(find_folder('4_labels_cleaned'), 'cleaned_labels*.csv')
         label_files = glob.glob(f_path)
         if len(label_files) == 1:
             f_path = label_files[0]
@@ -111,7 +99,7 @@ def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_id
         else:
             raise ValueError('Found {} different files for cleaned labels. Provide "name" argument to specify which.'.format(len(label_files)))
     else:
-        f_path = os.path.join(find_folder('5_labels_cleaned'), '{}.csv'.format(name))
+        f_path = os.path.join(find_folder('4_labels_cleaned'), '{}.csv'.format(name))
         annotation_files = glob.glob(f_path)
     dtypes = {'id': str, 'question_id': 'Int64', 'answer_id': 'Int64'}
     if len(annotation_files) == 1:
@@ -163,7 +151,7 @@ def get_sampled_data(dtype='*', usecols=None):
     """Read sampled data
     :param dtype: possible values: "original", "anonymized", "encrypted", default: read all sampled data
     """
-    f_names = glob.glob(os.path.join(find_folder('3_sampled'), 'sampled_{}_*.csv'.format(dtype)))
+    f_names = glob.glob(os.path.join(find_folder('2_sampled'), 'sampled_{}_*.csv'.format(dtype)))
     logger = logging.getLogger(__name__)
     if len(f_names) == 0:
         raise FileNotFoundError('No data files could be found')
@@ -177,7 +165,7 @@ def get_sampled_data(dtype='*', usecols=None):
 
 def get_batched_sample_data():
     df = pd.DataFrame()
-    f_names = glob.glob(os.path.join(find_folder('3_sampled'), 'batch_*', 'batch_*.csv'))
+    f_names = glob.glob(os.path.join(find_folder('2_sampled'), 'batch_*', 'batch_*.csv'))
     for f_n in f_names:
         df = df.append(pd.read_csv(f_n, header=None, names=['tweet_id', 'tweet_text'], dtype={'tweet_id': str, 'tweet_text': str}, index_col=None))
     return df
@@ -190,7 +178,7 @@ def get_uploaded_batched_data(availability=None, mode='*'):
     if availability not in availabilities:
         raise ValueError('Parameter availability is {} but has to be one of {}'.format(availability, ', '.join(availabilities)))
     df = pd.DataFrame()
-    f_names = glob.glob(os.path.join(find_folder('4_labelled'), mode, 'batches', '*.csv'))
+    f_names = glob.glob(os.path.join(find_folder('3_labelled'), mode, 'batches', '*.csv'))
     for f_n in f_names:
         df = df.append(pd.read_csv(f_n, index_col=None, dtype={'tweet_id': str, 'tweet_text': str}))
     if len(df) == 0:
@@ -207,7 +195,7 @@ def get_checked_tweets(mode='*', availability='*', df=None):
     if mode not in possible_modes:
         raise ValueError('Parameter mode is {} but has to be one of {}'.format(mode, ', '.join(possible_modes)))
     df_checked = pd.DataFrame()
-    f_names = glob.glob(os.path.join(find_folder('4_labelled'), mode, 'batches', '*.csv'))
+    f_names = glob.glob(os.path.join(find_folder('3_labelled'), mode, 'batches', '*.csv'))
     for f_n in f_names:
         df_checked = df_checked.append(pd.read_csv(f_n, index_col=None, dtype={'tweet_id': str, 'tweet_text': str}))
     df_checked = df_checked[['tweet_id', 'availability']]
@@ -220,15 +208,15 @@ def get_checked_tweets(mode='*', availability='*', df=None):
 
 def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, drop_retweets=False, usecols=None, nrows=None):
     """
-    Return prediction data. Prediction data should be in `data/6_predicted`. All file names should have the following pattern: `predicted_{column_name}_{YYY}-{MM}-{dd}_{5-char-hash}.csv`.
+    Return prediction data. Prediction data should be in `data/5_predicted`. All file names should have the following pattern: `predicted_{column_name}_{YYY}-{MM}-{dd}_{5-char-hash}.csv`.
     The column name can be an arbitrary tag (e.g. question tag) which should be unique.
-    :param include_raw_data: Merge predictions with 2_cleaned_data (by default True)
+    :param include_raw_data: Merge predictions with 1_parsed data (by default True)
     :param dtype: Raw data dtype (default: anonymized), relevant if include_raw_data is set to True.
     :param flag: Filter raw data by certain flags, relevant if include_raw_data is set to True.
     :param drop_retweets: Drop retweets (default: False), relevant if include_raw_data is set to True.
-    :param usecols: Only select certains columns from 2_cleaned_data (by default all), relevant if include_raw_data is set to True.
+    :param usecols: Only select certains columns from 1_parsed data (by default all), relevant if include_raw_data is set to True.
     """
-    f_pattern = os.path.join(find_folder('6_predicted'), 'predicted_*.csv')
+    f_pattern = os.path.join(find_folder('5_predicted'), 'predicted_*.csv')
     f_names = glob.glob(f_pattern)
     if len(f_names) == 0:
         raise FileNotFoundError('No prediction files present with pattern {}'.format(f_pattern))
@@ -252,7 +240,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
         df.rename(columns=column_rename, inplace=True)
         df_pred = pd.concat([df_pred, df], axis=1)
     if include_raw_data:
-        df = get_cleaned_data(dtype=dtype, usecols=usecols, nrows=nrows)
+        df = get_parsed_data(dtype=dtype, usecols=usecols, nrows=nrows)
         assert len(df) == len(df_pred), 'Length of prediction and raw data are not equal'
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1, sort=True)
@@ -285,7 +273,7 @@ def get_all_data(include_all_data=False, extra_cols=None, dtype='anonymized', s_
         if extra_cols is not None:
             for ec in extra_cols:
                 usecols.append(ec)
-    df = get_cleaned_data(dtype=dtype, usecols=usecols, nrows=nrows)
+    df = get_parsed_data(dtype=dtype, usecols=usecols, nrows=nrows)
     if include_predictions:
         df_pred = get_predicted_data(include_raw_data=False, dtype=dtype, nrows=nrows)
         df_pred.index = df.index
@@ -407,7 +395,7 @@ def get_dtypes(usecols=None):
         dtypes = {i:v for i,v in dtypes.items() if i in usecols}
     return dtypes
 
-def get_f_name(dtype, year, processing_step='merged', flag=None, contains_keywords=False):
+def get_f_name(dtype, processing_step='merged', flag=None, contains_keywords=False, fmt='csv'):
     if flag is None:
         flag = ''
     else:
@@ -416,12 +404,7 @@ def get_f_name(dtype, year, processing_step='merged', flag=None, contains_keywor
         contains_keywords_flag = '_contains_keywords'
     else:
         contains_keywords_flag = ''
-    if year is None:
-        f_name = '{}_{}{}{}.csv'.format(processing_step, dtype, flag, contains_keywords_flag)
-    else:
-        if not (isinstance(year, str) or isinstance(year, int)):
-            raise ValueError('Please provide the year as an integer or string')
-        f_name = '{}_{}_year_{}{}{}.csv'.format(processing_step, dtype, year, flag, contains_keywords_flag)
+    f_name = f'{processing_step}_{dtype}{flag}{contains_keywords_flag}.{fmt}'
     return f_name
 
 def find_file(f_name, subfolder='1_merged', cached=False):

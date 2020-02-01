@@ -8,7 +8,7 @@ import logging
 
 def main(dtype='anonymized'):
     """
-    This script creates a new file `data/2_cleaned/2_cleaned_finetune.csv` containing data to fine-tune a text classification model.
+    This script creates a new file `data/1_parsed/parsed_{dtype}_finetune.csv` containing data to fine-tune a text classification model.
     It excludes training data and duplicates.
     """
     # logging
@@ -28,7 +28,7 @@ def main(dtype='anonymized'):
     df = df[(~df.A) & (~df.is_duplicate) & (df.token_count >= 3) & (~df.is_retweet) & (df.contains_keywords)]
 
     # write output file
-    f_path = os.path.join(find_folder('2_cleaned'), 'cleaned_{}_finetune.csv'.format(dtype))
+    f_path = os.path.join(find_folder('1_parsed'), 'parsed_{}_finetune.csv'.format(dtype))
     logger.info('Writing {:,} lines to file {}...'.format(len(df), f_path))
     df[['text']].to_csv(f_path, index=False)
 

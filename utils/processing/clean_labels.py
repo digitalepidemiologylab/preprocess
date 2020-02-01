@@ -5,7 +5,7 @@ from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-from utils.helpers import find_folder, get_labelled_data, get_merged_data
+from utils.helpers import find_folder, get_labelled_data, get_parsed_data
 from tqdm import tqdm
 import logging
 
@@ -147,7 +147,7 @@ class CleanLabels(object):
         return labels
 
     def contains_keywords(self, labels):
-        df = get_merged_data(usecols=['id', 'contains_keywords'])
+        df = get_parsed_data(usecols=['id', 'contains_keywords'])
         labels = pd.merge(labels, df, left_on='tweet_id', right_on='id', how='inner')
         return labels[labels.contains_keywords]
 
@@ -217,7 +217,7 @@ class CleanLabels(object):
             self.logger.info('No labels to write. Maybe the filtering parameters are too strict. Aborting.')
             return
         # write full file
-        folder_path = find_folder('5_labels_cleaned')
+        folder_path = find_folder('4_labels_cleaned')
         option_flags = '_'.join(options)
         f_path = os.path.join(folder_path, 'cleaned_labels_{}.csv'.format(option_flags))
         labels[['id', 'text', 'question_id', 'question_tag', 'label_id', 'label_tag']].to_csv(f_path, index=False)

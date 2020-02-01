@@ -1,5 +1,5 @@
 import sys; sys.path.append('../..')
-from utils.helpers import get_cleaned_data, get_sampled_data, get_labelled_data, get_cleaned_labelled_data, find_folder, get_uploaded_batched_data, get_batched_sample_data
+from utils.helpers import get_parsed_data, get_sampled_data, get_labelled_data, get_cleaned_labelled_data, find_folder, get_uploaded_batched_data, get_batched_sample_data
 import pandas as pd
 import numpy as np
 import os
@@ -81,7 +81,7 @@ class SampleGenerator(object):
         self.sample = sample
         return sample
 
-    def write_sample(self, sample, dtype, mode, year=None, columns=['id','text'], size='', min_date=None, max_date=None):
+    def write_sample(self, sample, dtype, mode, columns=['id','text'], size='', min_date=None, max_date=None):
         if len(sample) == 0:
             self.logger.warn('No sample files written. Aborting.')
             return
@@ -94,7 +94,7 @@ class SampleGenerator(object):
             max_date_str = '_max_date_{}'.format(max_date)
         f_name = 'sampled_{dtype}_{mode}_{len_sample}_{size}_{seed}{min_date}{max_date}_created_{timestamp}.csv'.format(dtype=dtype, mode=mode, len_sample=len(sample),
                 size=size, seed=self.seed, timestamp=timestamp, min_date=min_date_str, max_date=max_date_str)
-        full_path = os.path.join(find_folder('3_sampled'), f_name)
+        full_path = os.path.join(find_folder('2_sampled'), f_name)
         self.logger.info('Writing file {} ...'.format(full_path))
         if 'all' in columns:
             sample.to_csv(full_path, encoding='utf8')
@@ -118,13 +118,13 @@ class SampleGenerator(object):
         self.logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
 
     def generate_batch(self, num_tweets=None, batch_id=None, tail=True, ignore_previous=False):
-        """Generates a new batch which takes as input a large sample file provided in `data/3_sampled` and generates a new batch
+        """Generates a new batch which takes as input a large sample file provided in `data/2_sampled` and generates a new batch
         not including previously annotated tweets.
         """
         if num_tweets is None:
             raise ValueError('Num tweets is zero. Cannot create empty batch.')
         # vars
-        sample_folder = find_folder('3_sampled')
+        sample_folder = find_folder('2_sampled')
         # load data
         df_samples = get_sampled_data()
         if len(df_samples) == 0:
@@ -200,14 +200,14 @@ class SampleGenerator(object):
         return self.indices,self.days,self.months,self.years
 
 
-def run(dtype='anonymized', size=None, year=None, contains_keywords=False, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
+def run(dtype='anonymized', size=None, contains_keywords=False, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
     logger = logging.getLogger(__name__)
     if bin_size is None:
         logger.info('Creating sample of size {:,}...'.format(size))
     else:
         logger.info('Creating sample of size {:,} or bin size {:,}...'.format(size, bin_size))
     logger.info('Reading data of type "{}"...'.format(dtype))
-    df = get_cleaned_data(dtype=dtype, year=year, contains_keywords=contains_keywords, usecols=['id', 'text', 'created_at', 'use_for_labelling', 'contains_keywords'])
+    df = get_parsed_data(dtype=dtype, contains_keywords=contains_keywords, usecols=['id', 'text', 'created_at', 'use_for_labelling', 'contains_keywords'])
     df = df[min_date:max_date]
     generator = SampleGenerator(seed=seed)
     sample = pd.DataFrame()
@@ -234,4 +234,4 @@ def run(dtype='anonymized', size=None, year=None, contains_keywords=False, mode=
     elif mode == 'random':
         logger.info('Generating random sample...')
         sample = generator.random_sample(df, size)
-    generator.write_sample(sample, dtype, mode, year=year, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date)
+    generator.write_sample(sample, dtype, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date)

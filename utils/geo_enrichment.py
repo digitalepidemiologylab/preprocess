@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import pickle
 import logging
-from preprocess.utils.helpers import get_cleaned_data, get_cache_path, get_data_folder
+from preprocess.utils.helpers import get_parsed_data, get_cache_path, get_data_folder
 import numpy as np
 from tqdm import tqdm
 import numpy as np
@@ -36,7 +36,7 @@ class GeoEnrichment():
         2) 'place_centroid': Compute centroid of place field
         3) 'user_location': Infer geo-location from user location
 
-        Method returns pandas DataFrame with 3 new columns which the same number of rows as provided from `get_cleaned_data` but with 3 new columns:
+        Method returns pandas DataFrame with 3 new columns which the same number of rows as provided from `get_parsed_data` but with 3 new columns:
         - `longitude_enriched`
         - `latitude_enriched`
         - `geo_enriched_type`
@@ -47,7 +47,7 @@ class GeoEnrichment():
         if not use_cache or not os.path.isfile(cache_path):
             log.info(f'Computing geo-enriched data for type {dtype}...')
             log.info(f'Load data...')
-            df = get_cleaned_data(dtype=dtype, usecols=self.cleaned_data_cols, nrows=nrows_input_data)
+            df = get_parsed_data(dtype=dtype, usecols=self.cleaned_data_cols, nrows=nrows_input_data)
             geo_data = self.get_geo_data(use_cache=use_cache_geo_data, with_altnames=with_altnames)
             kp = self.get_keyword_processor(use_cache=use_cache_keyword_processor, with_altnames=with_altnames, geo_data=geo_data)
             # enrich geo-information

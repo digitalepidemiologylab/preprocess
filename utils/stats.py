@@ -132,7 +132,7 @@ class Stats(object):
 
     def annotation_cleaned(self):
         self.header('Cleaned annotations')
-        f_path = os.path.join(find_folder('5_labels_cleaned'), 'cleaned_labels.csv')
+        f_path = os.path.join(find_folder('4_labels_cleaned'), 'cleaned_labels.csv')
         try:
             self.logger.info('Reading cleaned annotation data...')
             df = pd.read_csv(f_path)
@@ -192,7 +192,7 @@ class Stats(object):
 
     def sampled_data(self):
         self.make_title('Sampled data')
-        f_names = glob.glob(os.path.join(find_folder('3_sampled'), 'sampled_{}_{}_*.csv'.format('*', '*')))
+        f_names = glob.glob(os.path.join(find_folder('2_sampled'), 'sampled_{}_{}_*.csv'.format('*', '*')))
         num_sample_files = len(f_names)
         num_tweets_sampled = 0
         for f_name in f_names:
@@ -204,7 +204,7 @@ class Stats(object):
         self.make_title('Annotation data')
         self.text += 'Number of annotation results:\n'
         for mode in ['public', 'local', 'mturk', 'other']:
-            f_names = glob.glob(os.path.join(find_folder('4_labelled'), mode, '*.csv'))
+            f_names = glob.glob(os.path.join(find_folder('3_labelled'), mode, '*.csv'))
             num_annotations = 0
             for f_name in f_names:
                 num_annotations += sum(1 for line in open(f_name))
@@ -213,7 +213,7 @@ class Stats(object):
 
     def cleaned_annotation_data(self):
         self.make_title('Cleaned annotation data')
-        f_name = os.path.join(find_folder('5_labels_cleaned'), 'cleaned_labels.csv')
+        f_name = os.path.join(find_folder('4_labels_cleaned'), 'cleaned_labels.csv')
         num_annotations = 0
         if os.path.isfile(f_name):
             num_annotations = sum(1 for line in open(f_name))

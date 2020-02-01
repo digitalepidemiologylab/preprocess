@@ -62,7 +62,7 @@ class S3Helper:
             self.logger.info('... of type {}...'.format(mode))
             mode_prefix = mode + '-batch-job' if mode in ['local', 'mturk'] else mode
             key_prefix = 'other/csv/{}/{}-results'.format(project_name, mode_prefix)
-            annotation_dir = os.path.join(find_project_root(), 'data', '4_labelled', mode)
+            annotation_dir = os.path.join(find_project_root(), 'data', '3_labelled', mode)
             local_files = [os.path.basename(p) for p in glob.glob(os.path.join(annotation_dir, '*.csv'))]
             remote_files, r_num_files_synced = self.download_files(key_prefix, annotation_dir, local_files)
             r_num_files_removed = self.remove_old_files(remote_files=remote_files, local_files=local_files, local_dir=annotation_dir)
