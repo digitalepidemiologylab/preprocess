@@ -27,7 +27,7 @@ class GeoEnrichment():
         self.columns = ['geonameid', 'name', 'asciiname', 'alternatenames', 'latitude', 'longitude', 'feature_class', 'feature_code', 'country_code', 'cc2', 'admin1', 'admin2', 'admin3', 'admin4', 'population', 'elevation', 'dem', 'timezone', 'modification_date']
         self.raw_data = os.path.join(get_data_folder(), 'geodata', 'allCountries.txt')
         self.feature_code_path = os.path.join(get_data_folder(), 'geodata', 'featureCodes_en.txt')
-        self.cleaned_data_cols = ['id', 'has_place_bounding_box', 'has_coordinates', 'user.location', 'place.bounding_box.centroid', 'longitude', 'latitude']
+        self.parsed_data_cols = ['id', 'has_place_bounding_box', 'has_coordinates', 'user.location', 'place.bounding_box.centroid', 'longitude', 'latitude']
 
     def get_geo_enriched_data(self, dtype='anonymized', with_altnames=False, use_cache=True, use_cache_geo_data=True, use_cache_keyword_processor=True, no_parallel=True, nrows_input_data=None):
         """
@@ -47,7 +47,7 @@ class GeoEnrichment():
         if not use_cache or not os.path.isfile(cache_path):
             log.info(f'Computing geo-enriched data for type {dtype}...')
             log.info(f'Load data...')
-            df = get_parsed_data(dtype=dtype, usecols=self.cleaned_data_cols, nrows=nrows_input_data)
+            df = get_parsed_data(dtype=dtype, usecols=self.parsed_data_cols, nrows=nrows_input_data)
             geo_data = self.get_geo_data(use_cache=use_cache_geo_data, with_altnames=with_altnames)
             kp = self.get_keyword_processor(use_cache=use_cache_keyword_processor, with_altnames=with_altnames, geo_data=geo_data)
             # enrich geo-information

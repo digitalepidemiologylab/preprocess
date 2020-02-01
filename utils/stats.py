@@ -33,7 +33,7 @@ class Stats(object):
     def overview(self):
         self.header('Overview')
         self.raw_data()
-        self.merged_data()
+        self.parsed_data()
         self.sampled_data()
         self.annotation_data()
         self.cleaned_annotation_data()
@@ -176,18 +176,18 @@ class Stats(object):
             self.text += 'No raw data present.\n'
         self.text += '\n'
 
-    def merged_data(self):
+    def parsed_data(self):
         num_lines = 0
         for dtype in ['original', 'anonymized', 'encrypted']:
-            path = os.path.join(find_folder('1_merged'), 'merged_{}.csv'.format(dtype))
+            path = os.path.join(find_folder('1_parsed'), 'parsed_{}.csv'.format(dtype))
             if os.path.isfile(path):
                 num_lines = sum(1 for line in open(path))
                 break
-        self.make_title('Merged data')
+        self.make_title('Parsed data')
         if num_lines > 0:
-            self.add_key_value('Num tweets in merged data', num_lines - 1)
+            self.add_key_value('Num tweets in parsed data', num_lines - 1)
         else:
-            self.text += 'No merged data present.\n'
+            self.text += 'No parsed data present.\n'
         self.text += '\n'
 
     def sampled_data(self):
