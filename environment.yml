@@ -1,0 +1,15 @@
+name: preprocess
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy
+  - tqdm
+  - munch
+  - matplotlib
+  - python=3.6
+  - shapely
+  - seaborn
+  - spacy
+  - nltk
+  - pandas
