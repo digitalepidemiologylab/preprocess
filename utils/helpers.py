@@ -13,7 +13,7 @@ import re
 log = logging.getLogger(__name__)
 
 
-def get_parsed_data(dtype='original', frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
+def get_parsed_data(dtype='anonymized', frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
     """Read parsed data
     :param dtype: possible values: "original", "anonymized", "encrypted"
     :param frac: fraction of data to be read (default 1)

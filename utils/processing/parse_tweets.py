@@ -513,10 +513,9 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     logger.info('Merging data...')
     all_data = {dtype: list(itertools.chain.from_iterable([d[dtype] for d in all_data])) for dtype in config.output_types}
 
-    def read_df(f_name, fmt=None):
+    def read_df(dtype='anonymized', fmt='pkl'):
+        f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
         logger.info(f'Reading {f_name}...')
-        if fmt is None:
-            fmt = f_name.split('.')[-1]
         if fmt == 'pkl':
             _df = pd.read_pickle(f_name)
         elif fmt == 'csv':
@@ -527,18 +526,9 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             raise ValueError(f'Format {fmt} is not supported')
         return _df
 
-    def write_df(_df, f_name, fmt=None):
-        if os.path.isfile(f_name) and extend:
-            # take existing data and concatenate new
-            f_name_pre = '.'.join(f_name.split('.')[:-1]) + '.pkl'
-            if not os.path.isfile(f_name_pre):
-                raise Exception(f'Could not find file {f_name_pre} to extend')
-            logger.info(f'Appending to content in {f_name_pre}...')
-            _df_pre = read_df(f_name_pre, fmt='pkl')
-            _df = pd.concat([_df_pre, _df], axis=0, sort=True)
+    def write_df(_df, dtype='anonymized', fmt='pkl'):
+        f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
         logger.info(f'Writing {f_name}...')
-        if fmt is None:
-            fmt = f_name.split('.')[-1]
         if fmt == 'pkl':
             _df = _df.to_pickle(f_name)
         elif fmt == 'csv':
@@ -569,15 +559,26 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     stats = defaultdict(dict)
     for t in config.output_types:
         if config.output_types[t]:
+            logger.info(f'Sorting data for type {t}....')
             df = pd.DataFrame(all_data[t])
+            # set proper index
+            df['created_at'] = pd.to_datetime(df['created_at'])
+            df.sort_values('created_at', inplace=True)
+            if extend:
+                # read existing dtype file in pkl format
+                logger.info(f'Appending pre-existing data for dtype {t}...')
+                _df_pre = read_df(dtype=t, fmt='pkl')
+                logger.info(f'Concatentation {len(_df_pre):,} rows of pre-existing data with {len(df):,} of new data...')
+                df = pd.concat([_df_pre, df], axis=0, sort=False)
+                _df_pre = None # release memory
+                logger.info(f'Sorting concatenated data...')
+                df.sort_values('created_at', inplace=True)
+                df.reset_index(inplace=True)
             stats[t]['original_counts'] = len(df)
             # Drop dulicates by ID
             df.drop_duplicates(subset='id', keep='first', inplace=True)
             stats[t]['final_counts'] = len(df)
             logger.info('Writing data of type {} ...'.format(t))
-            df['created_at'] = pd.to_datetime(df['created_at'])
-            df.sort_values('created_at', inplace=True)
-            df.set_index('created_at', inplace=True, drop=False)
             # find text duplicates
             df['is_duplicate'] = df.duplicated(subset='text_hash', keep='first')
             stats[t]['num_text_duplicates'] = len(df[df['is_duplicate']])
@@ -585,8 +586,7 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             stats[t]['num_use_for_labelling'] = len(df[df['use_for_labelling']])
             stats[t]['num_use_for_prediction'] = len(df[df['use_for_prediction']])
             for fmt in formats:
-                f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
-                write_df(df, f_name, fmt=fmt)
+                write_df(df, dtype=t, fmt=fmt)
     e_time = time.time()
     report_counts(stats)
     logger.info('Finished after {:.1f} min'.format((e_time - s_time)/60.0))
