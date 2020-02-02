@@ -453,7 +453,7 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     config.input_data_path = os.path.join('data', '0_raw')
     config.output_data_path = os.path.join('data', '1_parsed')
     # fields to keep
-    config.keep_fields = ['id', 'created_at', 'text', 'in_reply_to_status_id', 'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count']
+    config.keep_fields = ['id', 'created_at', 'text', 'in_reply_to_status_id', 'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count', 'lang']
     config.keep_fields_user = ['id', 'screen_name', 'name', 'location', 'followers_count', 'friends_count']
     config.keep_fields_entities = ['hashtags', 'user_mentions']
     config.keep_fields_place = ['bounding_box', 'full_name', 'country_code', 'place_type']

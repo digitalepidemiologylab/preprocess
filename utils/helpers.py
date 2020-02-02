@@ -356,6 +356,7 @@ def get_dtypes(usecols=None):
             'latitude': 'float',
             'longitude': 'float',
             'media': str,
+            'lang': str,
             'place.bounding_box': str,
             'place.bounding_box.area': float,
             'place.bounding_box.centroid': str,
