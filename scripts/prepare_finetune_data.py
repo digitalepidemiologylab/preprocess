@@ -17,7 +17,8 @@ def main(dtype='anonymized'):
 
     # load data
     logger.info('Reading data...')
-    df = get_all_data(dtype=dtype, include_flags=True, include_predictions=False)
+    usecols = ['id', 'text', 'is_duplicate', 'token_count', 'is_retweet', 'contains_keywords']
+    df = get_all_data(dtype=dtype, include_flags=True, include_predictions=False, usecols=usecols)
     
     # fine tune data should
     # - not contain any training data

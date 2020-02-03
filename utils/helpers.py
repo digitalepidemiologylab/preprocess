@@ -252,7 +252,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=False, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
+def get_all_data(include_all_data=False, usecols=None, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
@@ -265,11 +265,9 @@ def get_all_data(include_all_data=False, extra_cols=None, dtype='anonymized', s_
     :param geo_enrichment_type: Can be None (do not include any enrichment data) or 'all'. If set, will include inferred geo data
     """
     # load data
-    if include_all_data:
-        usecols = None
-    else:
+    if usecols is None:
         # default columns
-        usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at']
+        usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at' , 'lang']
         if extra_cols is not None:
             for ec in extra_cols:
                 usecols.append(ec)
