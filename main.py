@@ -75,13 +75,15 @@ class ArgParse(object):
         parser.add_argument('-bs', '--bin-size', type=int, required=False, dest='bin_size', help='Number of tweets per bin')
         parser.add_argument('-d', '--dtype', type=str, required=False, dest='dtype', default='anonymized', nargs='?', help='Data source type to use (can be original, anonymous or encrypted)')
         parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='random', help='Sampling mode. Random: Sample randomly. Monthly: Try to sample evenly within months.')
+        parser.add_argument('-l', '--langs', default=[], nargs='+', required=False, help='Filter by language(s)')
         parser.add_argument('--contains-keywords', dest='contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords')
+        parser.add_argument('--include-replies', dest='include_replies', default=False, action='store_true', help='Include replies')
         parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split')
         parser.add_argument('--extend', action='store_true', help='Extending existing sample given by seed by removing already labelled tweets. If size is <= original sample size this has no effect except removing labelled tweets');
         parser.add_argument('--max-date', dest='max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max')
         parser.add_argument('--min-date', dest='min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min')
         args = parser.parse_args(sys.argv[2:])
-        sample_tweets.run(dtype=args.dtype, size=args.size, contains_keywords=args.contains_keywords, mode=args.mode, seed=args.seed, extend=args.extend, bin_size=args.bin_size, min_date=args.min_date, max_date=args.max_date)
+        sample_tweets.run(dtype=args.dtype, size=args.size, contains_keywords=args.contains_keywords, langs=args.langs, include_replies=args.include_replies, mode=args.mode, seed=args.seed, extend=args.extend, bin_size=args.bin_size, min_date=args.min_date, max_date=args.max_date)
 
     def batch(self):
         from utils.processing.sample_tweets import SampleGenerator

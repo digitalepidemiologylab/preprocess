@@ -81,7 +81,7 @@ class SampleGenerator(object):
         self.sample = sample
         return sample
 
-    def write_sample(self, sample, dtype, mode, columns=['id','text'], size='', min_date=None, max_date=None):
+    def write_sample(self, sample, dtype, mode, columns=['id','text'], size='', min_date=None, max_date=None, flags=''):
         if len(sample) == 0:
             self.logger.warn('No sample files written. Aborting.')
             return
@@ -92,8 +92,8 @@ class SampleGenerator(object):
         max_date_str = ''
         if max_date is not None:
             max_date_str = '_max_date_{}'.format(max_date)
-        f_name = 'sampled_{dtype}_{mode}_{len_sample}_{size}_{seed}{min_date}{max_date}_created_{timestamp}.csv'.format(dtype=dtype, mode=mode, len_sample=len(sample),
-                size=size, seed=self.seed, timestamp=timestamp, min_date=min_date_str, max_date=max_date_str)
+        f_name = 'sampled_{dtype}_{mode}_{len_sample}_{size}_{seed}{min_date}{max_date}_created_{timestamp}{flags}.csv'.format(dtype=dtype, mode=mode, len_sample=len(sample),
+                size=size, seed=self.seed, timestamp=timestamp, min_date=min_date_str, max_date=max_date_str, flags=flags)
         full_path = os.path.join(find_folder('2_sampled'), f_name)
         self.logger.info('Writing file {} ...'.format(full_path))
         if 'all' in columns:
@@ -200,15 +200,46 @@ class SampleGenerator(object):
         return self.indices,self.days,self.months,self.years
 
 
-def run(dtype='anonymized', size=None, contains_keywords=False, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
+def run(dtype='anonymized', size=None, langs=None, include_replies=False, contains_keywords=False, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
     logger = logging.getLogger(__name__)
     if bin_size is None:
         logger.info('Creating sample of size {:,}...'.format(size))
     else:
         logger.info('Creating sample of size {:,} or bin size {:,}...'.format(size, bin_size))
     logger.info('Reading data of type "{}"...'.format(dtype))
-    df = get_parsed_data(dtype=dtype, contains_keywords=contains_keywords, usecols=['id', 'text', 'created_at', 'use_for_labelling', 'contains_keywords'])
-    df = df[min_date:max_date]
+    df = get_parsed_data(dtype=dtype, usecols=['id', 'text', 'is_duplicate', 'created_at', 'use_for_labelling', 'contains_keywords', 'lang', 'in_reply_to_status_id'])
+    logger.info(f'Read {len(df):,} samples. Filtering...')
+    flags = ''
+    # Filter by date
+    if min_date is not None or max_date is not None:
+        logger.info('Filtering by dates...')
+        df = df[min_date:max_date]
+    # Select use for labelling (not retweet, no extracted tweet) and no duplicate
+    logger.info('Filtering for default flags (use_for_labelling/is_duplicate)...')
+    df = df[(df.use_for_labelling) & (~df.is_duplicate)]
+    # Remove if reply
+    if not include_replies:
+        logger.info('Filtering replies...')
+        df = df[df.in_reply_to_status_id.isna()]
+        flags += '_include_replies'
+    # Contains keywords
+    if contains_keywords:
+        logger.info('Filtering for contains_keywords...')
+        df = df[df.contains_keywords]
+        flags += '_contains_keywords'
+    # Filter by language
+    if isinstance(langs, list):
+        if len(langs) > 0:
+            logger.info('Filtering for languages {}...'.format(','.join(langs)))
+            df = df[df.lang.isin(langs)]
+            flags += '_langs_{}'.format(','.join(langs))
+    # is_duplicate only marks duplicates before replacing <url> and <@user> tokens
+    logger.info('Final screening for duplicates...')
+    df['text_cleared'] = df.text.str.replace(r'@<user>|<url>', '')
+    df['text_cleared'] = df.text_cleared.str.strip()
+    df = df.drop_duplicates(subset=['text_cleared'])
+    df = df.drop(['text_cleared'], axis=1) # release memory
+    logger.info(f'... {len(df):,} rows in filtered data')
     generator = SampleGenerator(seed=seed)
     sample = pd.DataFrame()
     if mode == 'monthly':
@@ -234,4 +265,4 @@ def run(dtype='anonymized', size=None, contains_keywords=False, mode='monthly', 
     elif mode == 'random':
         logger.info('Generating random sample...')
         sample = generator.random_sample(df, size)
-    generator.write_sample(sample, dtype, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date)
+    generator.write_sample(sample, dtype, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date, flags=flags)
