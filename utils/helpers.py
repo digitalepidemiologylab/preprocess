@@ -261,7 +261,7 @@ def get_all_data(include_all_data=False, usecols=None, extra_cols=None, dtype='a
     :param e_date: End date filter (YYYY-MM-dd)
     :param include_flags: Include certain flags (S: used in sampling, L: labelled, A: cleaned labelled)
     :param mode: Annotation mode (*/mturk/local/public/other). Only relevant when include_flags set to true
-    :param include_predictions: Include all model predictions 
+    :param include_predictions: Include all model predictions
     :param geo_enrichment_type: Can be None (do not include any enrichment data) or 'all'. If set, will include inferred geo data
     """
     # load data

@@ -3,9 +3,6 @@ from collections import Counter
 import os
 import json
 from utils.helpers import find_folder, get_cleaned_labelled_data, get_project_info, find_project_root
-import sklearn.model_selection
-import pandas as pd
-import boto3
 from utils.s3_helper import S3Helper
 from utils.stats import Stats
 from utils.misc import JSONEncoder
@@ -33,6 +30,9 @@ def init(project, template):
 
 
 def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', balanced_labels=False, all_questions=False, label_tags=[], labelled_as=None, has_label=''):
+    import sklearn.model_selection
+    import pandas as pd
+
     """Splits cleaned labelled data into training and test set"""
     def _filter_for_label_balance(df):
         """Performs undersampling for overrepresanted label classes"""

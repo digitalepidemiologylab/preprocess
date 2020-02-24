@@ -103,19 +103,33 @@ class SampleGenerator(object):
 
     def stats(self, ignore_previous=False):
         df_samples = get_sampled_data()
-        df_labels = get_labelled_data()
+        try:
+            df_labels = get_labelled_data()
+        except FileNotFoundError:
+            tweet_ids_labelled = set()
+        else:
+            tweet_ids_labelled = set(df_labels['tweet_id'])
+        # Ids from previous batches
         df_batched = get_batched_sample_data()
+        if len(df_batched) > 0:
+            tweet_ids_batched = set(df_batched['tweet_id'])
+        else:
+            tweet_ids_batched = set()
+        # Ids from previous batches which were not available
         df_unavailable = get_uploaded_batched_data(availability='unavailable')
-        tweet_ids_batched = set(df_batched['tweet_id'])
-        tweet_ids_unavailable = set(df_unavailable['tweet_id'])
-        tweet_ids_labelled = set(df_labels['tweet_id'])
+        if len(df_unavailable) > 0:
+            tweet_ids_unavailable = set(df_unavailable['tweet_id'])
+        else:
+            tweet_ids_unavailable = set()
         tweet_ids_sampled = set(df_samples['tweet_id'])
+        # stats
         still_available = tweet_ids_sampled - tweet_ids_unavailable - tweet_ids_labelled
         if not ignore_previous:
             still_available -= tweet_ids_batched
         self.logger.info('Unique tweets in base sample(s): {:,} (labelled: {:,}, unavailable: {:,}, in previous batches: {:,})'.format(len(tweet_ids_sampled), len(tweet_ids_labelled), len(tweet_ids_unavailable), len(tweet_ids_batched)))
         self.logger.info('Tweets left to sample from: {:,}'.format(len(still_available)))
         self.logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
+
 
     def generate_batch(self, num_tweets=None, batch_id=None, tail=True, ignore_previous=False):
         """Generates a new batch which takes as input a large sample file provided in `data/2_sampled` and generates a new batch
@@ -125,17 +139,30 @@ class SampleGenerator(object):
             raise ValueError('Num tweets is zero. Cannot create empty batch.')
         # vars
         sample_folder = find_folder('2_sampled')
-        # load data
+        # Ids from sample file
         df_samples = get_sampled_data()
         if len(df_samples) == 0:
             raise Exception('Sample file is empty. Generate a sample file first.')
-        df_labels = get_labelled_data()
-        df_unavailable = get_uploaded_batched_data(availability='unavailable')
-        df_batched = get_batched_sample_data()
-        tweet_ids_batched = set(df_batched['tweet_id'])
-        tweet_ids_unavailable = set(df_unavailable['tweet_id'])
-        tweet_ids_labelled = set(df_labels['tweet_id'])
         tweet_ids_sampled = set(df_samples['tweet_id'])
+        # Ids from previously labelled data
+        try:
+            df_labels = get_labelled_data()
+        except FileNotFoundError:
+            tweet_ids_labelled = set()
+        else:
+            tweet_ids_labelled = set(df_labels['tweet_id'])
+        # Ids from previous batches
+        df_batched = get_batched_sample_data()
+        if len(df_batched) > 0:
+            tweet_ids_batched = set(df_batched['tweet_id'])
+        else:
+            tweet_ids_batched = set()
+        # Ids from previous batches which were not available
+        df_unavailable = get_uploaded_batched_data(availability='unavailable')
+        if len(df_unavailable) > 0:
+            tweet_ids_unavailable = set(df_unavailable['tweet_id'])
+        else:
+            tweet_ids_unavailable = set()
         # remove tweets which are unavailable, have been previously labelled
         still_available = tweet_ids_sampled - tweet_ids_unavailable - tweet_ids_labelled
         if not ignore_previous:
