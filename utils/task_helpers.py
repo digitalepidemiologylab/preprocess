@@ -18,15 +18,9 @@ def init(project, template):
             json.dump(template, f, cls=JSONEncoder, indent=4)
         logger.info('Successfully wrote empty template file "{}". Please fill in values manually.'.format(project_fname))
         return
-    # attempt to find project info file from S3
+    # sync project info
     s3_helper = S3Helper()
-    project_files = s3_helper.list('other/json/projects')
-    for project_file in project_files:
-        if project_file.split('/')[-1].split('-')[0] == project:
-            s3_helper.download_file(project_file, project_fname)
-            logger.info('Successfully initialized project "{}". Find project config file under "{}".'.format(project, project_fname))
-            return
-    logger.error('Could not find project "{}" remotely. You can manually initialize a project with the --template option".'.format(project))
+    s3_helper.sync_project_info(project)
 
 
 def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', balanced_labels=False, all_questions=False, label_tags=[], labelled_as=None, has_label=''):

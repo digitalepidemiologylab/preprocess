@@ -1,4 +1,5 @@
 import boto3
+from botocore.exceptions import ClientError
 import os
 import glob
 import logging
@@ -21,6 +22,7 @@ class S3Helper:
 
     def sync(self, project_name, data_type='all', last_n_days=None):
         t_start = time.time()
+        self.sync_project_info(project_name)
         if data_type == 'all' or data_type == 'streaming':
             self.sync_streaming_data(project_name, last_n_days=last_n_days)
         if data_type == 'all' or data_type == 'annotation':
@@ -29,6 +31,26 @@ class S3Helper:
             self.sync_media_data(project_name)
         t_end = time.time()
         self.logger.info('Finished data sync in {:.1f} min.'.format((t_end - t_start)/60))
+
+    def sync_project_info(self, project_name):
+        project_fname = os.path.join(find_project_root(), 'project_info.json')
+        project_files = self.list('other/json/projects')
+        for project_file in project_files:
+            if project_file.split('/')[-1].split('-')[0] == project_name:
+                if not os.path.isfile(project_fname):
+                    # no local file present
+                    self.download_file(project_file, project_fname)
+                    self.logger.info('Successfully initialized project "{}". Find project config file under "{}".'.format(project_name, project_fname))
+                elif not self.is_up_to_date(project_file, project_fname):
+                    # local file present, but not up-to-date. remove old local file and download new
+                    os.remove(project_fname)
+                    self.download_file(project_file, project_fname)
+                    self.logger.info('Successfully updated project config "{}".'.format(project_fname))
+                else:
+                    # is up-to-date
+                    self.logger.info('Project config file is up-to-date.')
+                return
+        self.logger.error('Could not find project "{}" remotely.".'.format(project_name))
 
     def sync_streaming_data(self, project_name, last_n_days=10):
         self.logger.info('Syncing streaming data ...')
@@ -123,6 +145,19 @@ class S3Helper:
             download_file_delayed = joblib.delayed(download_file)
             parallel((download_file_delayed(self.bucket_name, key, download_dir) for key in tqdm(files_to_sync)))
         return all_files_basename, len(files_to_sync)
+
+    def is_up_to_date(self, key, local_file):
+        if not os.path.isfile(local_file):
+            return False
+        try:
+            last_modified_resp = self.client.head_object(Bucket=self.bucket_name, Key=key)
+        except ClientError:
+            return False
+        if 'LastModified' not in last_modified_resp:
+            return False
+        last_modified_remote = int(last_modified_resp['LastModified'].strftime('%s'))
+        last_modified_local = int(os.path.getmtime(local_file))
+        return last_modified_remote < last_modified_local
 
     def download_file(self, key, local=''):
         if local == '':
