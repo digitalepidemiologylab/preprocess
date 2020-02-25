@@ -244,10 +244,11 @@ def run(dtype='anonymized', size=None, langs=None, include_replies=False, contai
     # Select use for labelling (not retweet, no extracted tweet) and no duplicate
     logger.info('Filtering for default flags (use_for_labelling/is_duplicate)...')
     df = df[(df.use_for_labelling) & (~df.is_duplicate)]
-    # Remove if reply
     if not include_replies:
-        logger.info('Filtering replies...')
+        # by default filter replies
         df = df[df.in_reply_to_status_id.isna()]
+    else:
+        logger.info('Including replies...')
         flags += '_include_replies'
     # Contains keywords
     if contains_keywords:
@@ -260,6 +261,13 @@ def run(dtype='anonymized', size=None, langs=None, include_replies=False, contai
             logger.info('Filtering for languages {}...'.format(','.join(langs)))
             df = df[df.lang.isin(langs)]
             flags += '_langs_{}'.format(','.join(langs))
+    # Filter previous
+    if extend:
+        logger.info('Extending previous sampled data...')
+        flags += '_extended'
+        df_sampled = get_sampled_data()
+        df = df[~df.id.isin(df_sampled.tweet_id)]
+        df = df[~df.text.isin(df_sampled.tweet_text)]
     # is_duplicate only marks duplicates before replacing <url> and <@user> tokens
     logger.info('Final screening for duplicates...')
     df['text_cleared'] = df.text.str.replace(r'@<user>|<url>', '')
