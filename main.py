@@ -10,7 +10,7 @@ Available commands:
   parse            Preprocessing of data to generate `/data/1_parsed`
   sample           Sample cleaned data to generate `data/2_sampled`
   batch            Creates a new batch of tweets from a sampled file in `/data/2_sampled`
-  clean_labels     Clean labels generated from Mturk (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
+  clean_labels     Clean labels generated from (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
   split            Splits data into training and test data
   sync             Sync project data from S3
@@ -105,7 +105,7 @@ class ArgParse(object):
         parser.add_argument('-s', '--selection-criterion', dest='selection_criterion', choices=['majority', 'unanimous'], required=False, default='majority', help='Can be "majority" (use majority vote) or "unanimous" (only select tweets with perfect agreement)')
         parser.add_argument('-l', '--min-labels-cutoff', dest='min_labels_cutoff', type=int, required=False, default=3, help='Discard all tweets having less than min_labels_cutoff annotations')
         parser.add_argument('-a', '--selection-agreement', dest='selection_agreement', type=float, required=False, default=None, help='Consider only tweets with a certain level of annotation agreement. If provided overwrites selection_criterion param.')
-        parser.add_argument('-m', '--mode', choices=['mturk', 'local', 'public', 'other', '*'], type=str, required=False, default='all', help='Annotation mode which was used. Can be `mturk`, `local`, `public`, `other` or `all`')
+        parser.add_argument('-m', '--mode', choices=['mturk', 'local', 'public', 'other', 'all'], type=str, required=False, default='all', help='Annotation mode which was used. Can be `mturk`, `local`, `public`, `other` or `all`')
         parser.add_argument('--is-relevant', dest='is_relevant', action='store_true', help='Filter tweets which have been annotated as relevant/related')
         parser.add_argument('--exclude-incorrect', dest='exclude_incorrect', action='store_true', help='Remove annotations which have been manually flagged as incorrect')
         parser.add_argument('--cutoff-worker-outliers', dest='cutoff_worker_outliers', type=float, default=None, help='Remove all annotations by workers who have agreement scores below certain Z-score threshold (a reasonable value would be 2 or 3)')

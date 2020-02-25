@@ -10,7 +10,7 @@ import csv
 import logging
 import re
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_parsed_data(dtype='anonymized', frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
@@ -71,7 +71,6 @@ def get_labelled_data(pattern='*', mode='*', usecols=None):
             if annotator in df:
                 df['annotator_id'] = df['annotator_id'].fillna(df[annotator])
     if 'answer_tag' in df and 'question_tag' in df:
-        logger = logging.getLogger(__name__)
         null_answer_tags = sum(df.answer_tag.isnull())
         null_question_tags = sum(df.question_tag.isnull())
         if null_answer_tags > 0:
@@ -88,27 +87,20 @@ def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_id
     :param return_label_ids: Return label ID instead of label tag (default: False)
     :param has_label: Filter for tweets which have been annotated with this label. For multiple labels use | as OR seperator and , for AND (default: '').
     """
-    logger = logging.getLogger(__name__)
     if name == '':
         f_path = os.path.join(find_folder('4_labels_cleaned'), 'cleaned_labels*.csv')
-        label_files = glob.glob(f_path)
-        if len(label_files) == 1:
-            f_path = label_files[0]
-        elif len(label_files) == 0:
-            raise FileNotFoundError('No cleaned label files could be found with the pattern {}'.format(f_path))
-        else:
-            raise ValueError('Found {} different files for cleaned labels. Provide "name" argument to specify which.'.format(len(label_files)))
     else:
         f_path = os.path.join(find_folder('4_labels_cleaned'), '{}.csv'.format(name))
-        annotation_files = glob.glob(f_path)
+    annotation_files = glob.glob(f_path)
+    if len(annotation_files) == 0:
+        raise FileNotFoundError('No cleaned label files could be found with the pattern {}'.format(f_path))
+    elif len(annotation_files) > 1:
+        raise ValueError('Found {} different files for cleaned labels. Provide "name" argument to specify which.'.format(len(annotation_files)))
     dtypes = {'id': str, 'question_id': 'Int64', 'answer_id': 'Int64'}
-    if len(annotation_files) == 1:
-        df = pd.read_csv(annotation_files[0], encoding='utf8', dtype=dtypes)
-    else:
-        df = pd.DataFrame()
-        for annotation_file in annotation_files:
-            df_annot = pd.read_csv(annotation_file, encoding='utf8', dtype=dtypes)
-            df = pd.concat([df, df_annot], axis=0)
+    df = pd.DataFrame()
+    for annotation_file in annotation_files:
+        df_annot = pd.read_csv(annotation_file, encoding='utf8', dtype=dtypes)
+        df = pd.concat([df, df_annot], axis=0)
     possible_question_tags = df.question_tag.unique()
     if has_label is not None and has_label != '':
         for _has_label in has_label.split(','):
@@ -152,7 +144,6 @@ def get_sampled_data(dtype='*', usecols=None):
     :param dtype: possible values: "original", "anonymized", "encrypted", default: read all sampled data
     """
     f_names = glob.glob(os.path.join(find_folder('2_sampled'), 'sampled_{}_*.csv'.format(dtype)))
-    logger = logging.getLogger(__name__)
     if len(f_names) == 0:
         raise FileNotFoundError('No data files could be found')
     elif len(f_names) != 1:

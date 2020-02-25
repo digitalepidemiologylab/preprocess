@@ -153,12 +153,17 @@ class CleanLabels(object):
 
     def is_relevant(self, labels):
         answer_tags = labels['answer_tag'].unique()
-        if not 'relevant' in answer_tags and not 'related' in answer_tags:
-            raise ValueError('Labelled data does not contain a answer_tag called `relevant` or `related`. Therefore, filtering for relevant-only data is not possible.')
-        if 'relevant' in answer_tags and 'related' in answer_tags:
-            raise ValueError('Labelled data contains both answer tags `relevant` and `related`. Therefore, filtering for relevant-only data is ambiguous.')
-        relevant_label = 'relevant' if 'relevant' in answer_tags else 'related'
-        relevant_ids = labels[labels['answer_tag'] == relevant_label]['tweet_id']
+        relevant_tags = ['relevant', 'related', 'is_related', 'is_relevant']
+        found_relevant_tag = None
+        for relevant_tag in relevant_tags:
+            if relevant_tag in answer_tags:
+                if found_relevant_tag is not None:
+                    raise ValueError('Labelled data contains multiple versions of the tags {}. Therefore, filtering for relevant-only data is ambiguous.'.format(','.join(relevant_tags)))
+                else:
+                    found_relevant_tag = relevant_tag
+        if found_relevant_tag is None:
+            raise ValueError('Labelled data does not contain a answer_tag with any of the tags {}. Therefore, filtering for relevant-only data is not possible.'.format(','.join(relevant_tags)))
+        relevant_ids = labels[labels['answer_tag'] == found_relevant_tag]['tweet_id']
         return labels.loc[labels['tweet_id'].isin(relevant_ids)]
 
     def exclude_incorrect(self, labels):
