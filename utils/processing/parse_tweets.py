@@ -16,12 +16,35 @@ import multiprocessing
 import joblib
 import itertools
 import utils.helpers
+from utils.helpers import get_cache_path, get_dtypes
 import logging
 import shapely.geometry
 import pickle
 import spacy
 import hashlib
 import random
+
+# load spacy model
+nlp = spacy.load('en_core_web_sm')
+logger = logging.getLogger(__name__)
+default_columns = ['id', 'created_at', 'text', 'in_reply_to_status_id',
+       'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count',
+       'lang', 'user.id', 'user.screen_name', 'user.name', 'user.location',
+       'user.followers_count', 'user.friends_count', 'entities.hashtags',
+       'entities.user_mentions', 'has_place', 'has_place_bounding_box',
+       'place.bounding_box.centroid', 'place.bounding_box.area',
+       'has_coordinates', 'is_retweet', 'retweeted_status.id',
+       'retweeted_status.user.id', 'retweeted_status.user.followers_count',
+       'retweeted_status.in_reply_to_status_id',
+       'retweeted_status.retweet_count', 'retweeted_status.favorite_count',
+       'has_quoted_status', 'quoted_status.has_media', 'quoted_status.media',
+       'quoted_status.id', 'quoted_status.text', 'quoted_status.user.id',
+       'quoted_status.user.followers_count',
+       'quoted_status.in_reply_to_status_id', 'quoted_status.retweet_count',
+       'quoted_status.favorite_count', 'has_media', 'media',
+       'media_image_urls', 'extracted_quoted_tweet', 'contains_keywords',
+       'token_count', 'text_hash', 'place.bounding_box', 'place.full_name',
+       'place.country_code', 'place.place_type']
 
 class ParseTweet():
     """Wrapper class for functions to process/modify tweets"""
@@ -66,7 +89,11 @@ class ParseTweet():
             retweet_count = str(self.tweet['retweet_count'])
             if retweet_count.endswith('+'):
                 retweet_count = retweet_count[:-1]
-            return int(retweet_count)
+            try:
+                retweet_count = int(retweet_count)
+            except ValueError:
+                retweet_count = 0
+            return retweet_count
         elif field in ['id', 'in_reply_to_status_id', 'in_reply_to_user_id']:
             try:
                 return self.tweet[field + '_str']
@@ -282,7 +309,7 @@ class ParseTweet():
                 return True
         return False
 
-    def get_token_count(self, nlp):
+    def get_token_count(self):
         text = self.get_text()
         # remove user handles and URLs from text
         text = re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))', '', text)
@@ -370,13 +397,16 @@ class ParseTweet():
         return True
 
 
+def get_cache_location_from_fname(f_name, dtype):
+    f_name_base = os.path.basename(f_name)
+    f_path_cache = get_cache_path(f'{f_name_base}.{dtype}.csv', subfolder='parse_tweets')
+    return f_path_cache
+
 def process_file(f_name, config):
     all_data = {output_type: [] for output_type in config.output_types}
     count = 0
     if config.output_types.encrypted:
         encrypt = Encrypt()
-    # load spacy model
-    nlp = spacy.load(config.lang)
     with open(f_name, 'r') as f:
         num_lines = sum(1 for line in f)
         f.seek(0)
@@ -385,9 +415,14 @@ def process_file(f_name, config):
                 continue
             try:
                 tweet = json.loads(line)
-            except:
+            except json.decoder.JSONDecodeError:
                 # some files use single quotation, for this we need to use ast.literal_eval
                 tweet = ast.literal_eval(line)
+            except:
+                # sometimes parsing completely fails
+                logger.error('Error parsing line:')
+                logger.error(line)
+                continue
             if 'info' in tweet:
                 continue  # API log fields (can be ignored)
             pt = ParseTweet(tweet=tweet)
@@ -402,7 +437,7 @@ def process_file(f_name, config):
                     **pt.get_media_info(),
                     'extracted_quoted_tweet': False,
                     'contains_keywords': pt.contains_keywords(config.keywords),
-                    'token_count': pt.get_token_count(nlp),
+                    'token_count': pt.get_token_count(),
                     'text_hash': pt.get_text_hash()
                     }
             if config.output_types.original:
@@ -429,7 +464,7 @@ def process_file(f_name, config):
                         **pt.get_media_info(),
                         'extracted_quoted_tweet': True,
                         'contains_keywords': pt.contains_keywords(config.keywords),
-                        'token_count': pt.get_token_count(nlp),
+                        'token_count': pt.get_token_count(),
                         'text_hash': pt.get_text_hash()
                         }
                 if config.output_types.original:
@@ -442,12 +477,33 @@ def process_file(f_name, config):
                         tweet_obj_anonymized = pt.anonymize(tweet_obj)
                     all_data['encrypted'].append(encrypt.encode_tweet(copy(tweet_obj_anonymized), config.encrypt_fields))
                 count +=1
-    return all_data
+    # writing cache file
+    for dtype, df in all_data.items():
+        f_path_cache = get_cache_location_from_fname(f_name, dtype)
+        if len(all_data[dtype]) == 0:
+            df = pd.DataFrame(columns=default_columns)
+        else:
+            df = pd.DataFrame(all_data[dtype])
+        df.to_csv(f_path_cache, index=False)
+
+def get_used_files(output_path):
+    f_name_used = os.path.join(output_path, f'.used_data')
+    if os.path.isfile(f_name_used):
+        with open(f_name_used, 'r') as f:
+            used_files = list(l.strip() for l in f)
+    else:
+        used_files = []
+    return used_files
+
+def dump_used_files(data_files, output_path):
+    f_name_used = os.path.join(output_path, f'.used_data')
+    with open(f_name_used, 'w') as f:
+        for data_file in data_files:
+            f.write(f'{data_file}\n')
     
 def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, verbose=False):
     # setup
     s_time = time.time()
-    logger = logging.getLogger(__name__)
     # build config
     config = DefaultMunch(None)
     config.input_data_path = os.path.join('data', '0_raw')
@@ -483,58 +539,49 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
                 f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
                 if os.path.isfile(f_name):
                     raise Exception(f'File {f_name} already exists! Provide --overwrite flag or --extend flag (or remove file)')
+    # check for extend
+    if extend:
+        for t in config.output_types:
+            f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
+            if not os.path.isfile(f_name):
+                raise Exception(f'No file {f_name} found to extend')
     parallel = joblib.Parallel(n_jobs=num_cores)
     process_file_delayed = joblib.delayed(process_file)
     all_data_files = sorted([f for f in glob.glob(os.path.join(config.input_data_path, '**', '*.json*'), recursive=True) if os.path.isfile(f)])
-    data_files = all_data_files
     # extend
-    f_name_used_files = os.path.join(config.output_data_path, '.processed_data_files.pkl')
-    if extend:
+    if overwrite:
+        files_to_cache = all_data_files
+    else:
         # check for old file to extend
-        for t in config.output_types:
-            f_name = os.path.join(config.output_data_path, f'parsed_{t}.pkl')
-            if not os.path.isfile(f_name):
-                raise Exception(f'Could not find a pickle file {f_name}. Remove the --extend flag in order to run.')
-        # check for file that contains list of file names used
-        if os.path.isfile(f_name_used_files):
-            with open(f_name_used_files, 'rb') as f:
-                used_files = pickle.load(f)
-            data_files = list(set(all_data_files) - set(used_files))
-            if len(data_files) == 0:
-                logger.info('Files are up-to-date.')
-                return
-        else:
-            logger.warn(f"Couldn't find file {f_name_used_files}. Will compute everything from scratch.")
+        cached_files = []
+        for f_name in all_data_files:
+            missing_type = False
+            for t in config.output_types:
+                f_path_cache = get_cache_location_from_fname(f_name, t)
+                if not os.path.isfile(f_path_cache):
+                    missing_type = True
+            if not missing_type:
+                cached_files.append(f_name)
+        files_to_cache = list(set(all_data_files) - set(cached_files))
     # create batches of file names and process in parallel
-    logger.info('Running jobs...')
-    random.shuffle(data_files)
-    all_data = parallel((process_file_delayed(data_file, config) for data_file in tqdm(data_files)))
-    # parse
-    logger.info('Merging data...')
-    all_data = {dtype: list(itertools.chain.from_iterable([d[dtype] for d in all_data])) for dtype in config.output_types}
-
-    def read_df(dtype='anonymized', fmt='pkl'):
-        f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
-        logger.info(f'Reading {f_name}...')
-        if fmt == 'pkl':
-            _df = pd.read_pickle(f_name)
-        elif fmt == 'csv':
-            _df = pd.read_csv(f_name)
-        elif fmt == 'json':
-            _df = pd.read_json(f_name)
-        else:
-            raise ValueError(f'Format {fmt} is not supported')
-        return _df
+    if len(files_to_cache) > 0:
+        logger.info('Running jobs...')
+        random.shuffle(files_to_cache)
+        parallel((process_file_delayed(data_file, config) for data_file in tqdm(files_to_cache)))
+    else:
+        logger.info('All cache files up-to-date.')
 
     def write_df(_df, dtype='anonymized', fmt='pkl'):
         f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
         logger.info(f'Writing {f_name}...')
         if fmt == 'pkl':
-            _df = _df.to_pickle(f_name)
+            _df.to_pickle(f_name)
+        elif fmt == 'h5':
+            _df.to_hdf(f_name, key='df')
         elif fmt == 'csv':
-            _df = _df.to_csv(f_name, index=False)
+            _df.to_csv(f_name, index=False)
         elif fmt == 'json':
-            _df = _df.to_json(f_name)
+            _df.to_json(f_name)
         else:
             raise ValueError(f'Format {fmt} is not supported')
 
@@ -555,25 +602,35 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             for k, v in vals.items():
                 logger.info(f'- {k}: {v:,}')
 
-    # write output files
+    # merge
     stats = defaultdict(dict)
+    dtypes = get_dtypes()
+    if extend:
+        used_files = get_used_files(config.output_data_path)
+        data_files = list(set(all_data_files) - set(used_files))
+        if len(data_files) == 0:
+            logger.info(f'Nothing to extend. Everything up-to-date.')
+            return
+    else:
+        data_files = all_data_files
     for t in config.output_types:
         if config.output_types[t]:
-            logger.info(f'Sorting data for type {t}....')
-            df = pd.DataFrame(all_data[t])
-            # set proper index
+            logger.info(f'Processing data type {t}')
+            logger.info(f'Merging {len(data_files):,} cache files...')
+            f_names = [get_cache_location_from_fname(f_name, t) for f_name in data_files]
+            df = pd.concat([pd.read_csv(f_name, dtype=dtypes) for f_name in tqdm(f_names)], sort=False)
+            if extend:
+                f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
+                if os.path.isfile(f_name):
+                    logger.info(f'Merging with pre-existing data from {f_name}...')
+                    df = pd.concat([df, pd.read_csv(f_name, dtype=dtypes)], sort=False)
+            if len(df) == 0:
+                logger.warning(f'No data was collected for data type {t}')
+                continue
+            logger.info(f'Collected {len(df):,} rows of data')
+            logger.info('Sorting by column created_at...')
             df['created_at'] = pd.to_datetime(df['created_at'])
             df.sort_values('created_at', inplace=True)
-            if extend:
-                # read existing dtype file in pkl format
-                logger.info(f'Appending pre-existing data for dtype {t}...')
-                _df_pre = read_df(dtype=t, fmt='pkl')
-                logger.info(f'Concatentation {len(_df_pre):,} rows of pre-existing data with {len(df):,} of new data...')
-                df = pd.concat([_df_pre, df], axis=0, sort=False)
-                _df_pre = None # release memory
-                logger.info(f'Sorting concatenated data...')
-                df.sort_values('created_at', inplace=True)
-                df.reset_index(inplace=True)
             stats[t]['original_counts'] = len(df)
             # Drop dulicates by ID
             df.drop_duplicates(subset='id', keep='first', inplace=True)
@@ -590,6 +647,4 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     e_time = time.time()
     report_counts(stats)
     logger.info('Finished after {:.1f} min'.format((e_time - s_time)/60.0))
-    # write info file for which files were used
-    with open(f_name_used_files, 'wb') as f:
-        pickle.dump(all_data_files, f)
+    dump_used_files(all_data_files, config.output_data_path)

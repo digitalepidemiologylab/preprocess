@@ -59,7 +59,7 @@ class ArgParse(object):
         import utils.processing.parse_tweets as parse_tweets
         parser = ArgParseDefault(description='Preprocess raw data to create `data/1_parsed`')
         parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['anonymized'], nargs='+', help='Data source type to create. Anonymized replaces user mentions and URLs. Encrypted will encrypt certain fields (needs encryption key).')
-        parser.add_argument('-f', '--formats', dest='formats', nargs='+', choices=['pkl', 'csv', 'json'], default=['pkl', 'csv'], help='Output formats')
+        parser.add_argument('-f', '--formats', dest='formats', nargs='+', choices=['pkl', 'csv', 'json'], default=['csv'], help='Output formats (additional to h5).')
         parser.add_argument('-l', '--lang', default='en_core_web_sm', required=False, help='Spacy language model. This is used for word tokenization count.')
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
         parser.add_argument('--extend', dest='extend', action='store_true', help='Do extend existing parsed data. Extend requires a pickle file to work properly.')
