@@ -1,3 +1,4 @@
+import sys;sys.path.append('../..')
 import pandas as pd
 import os
 from copy import copy
@@ -146,15 +147,22 @@ def dump_used_files(data_files, output_path):
 def write_csv(df, f_name):
     df.to_csv(f_name, index=False, header=False)
 
-def write_csv_in_parallel(df, f_name):
+def write_csv_in_parallel(df, f_name, no_parallel):
     batch_size = int(1e6)
     num_rows = len(df)
     shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
-    dfs = [df[s:(s+batch_size)] for s in range(0, num_rows, batch_size)]
-    cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(len(dfs))]
-    logger.info('Writing {len(dfs)} partial csvs in parallel...')
-    with multiprocessing.Pool(len(dfs)) as pool:
-        pool.starmap(write_csv, [(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=len(dfs))])
+    indices = range(0, num_rows, batch_size)
+    dfs = (df[s:(s+batch_size)] for s in indices)
+    num_jobs = len(indices)
+    if no_parallel:
+        num_cores = 1
+    else:
+        num_cores = max(multiprocessing.cpu_count() - 1, 1)
+    cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
+    logger.info(f'Writing {num_jobs} partial csvs in parallel...')
+    parallel = joblib.Parallel(n_jobs=num_cores)
+    write_csv_delayed = joblib.delayed(write_csv)
+    parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
     logger.info('Merging csvs...')
     # write header
     df = pd.DataFrame(columns=default_columns)
@@ -244,7 +252,7 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
         elif fmt == 'h5':
             _df.to_hdf(f_name, key='df')
         elif fmt == 'csv':
-            write_csv_in_parallel(df, f_name)
+            write_csv_in_parallel(df, f_name, no_parallel)
         elif fmt == 'json':
             _df.to_json(f_name)
         else:
@@ -300,13 +308,15 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             # Drop dulicates by ID
             df.drop_duplicates(subset='id', keep='first', inplace=True)
             stats[t]['final_counts'] = len(df)
-            logger.info('Writing data of type {} ...'.format(t))
             # find text duplicates
+            logger.info('Find text duplicates...')
             df['is_duplicate'] = df.duplicated(subset='text_hash', keep='first')
             stats[t]['num_text_duplicates'] = len(df[df['is_duplicate']])
+            logger.info('Add decision flags...')
             df = add_decision_flags(df)
             stats[t]['num_use_for_labelling'] = len(df[df['use_for_labelling']])
             stats[t]['num_use_for_prediction'] = len(df[df['use_for_prediction']])
+            logger.info('Writing data of type {} ...'.format(t))
             for fmt in formats:
                 write_df(df, dtype=t, fmt=fmt)
     e_time = time.time()
