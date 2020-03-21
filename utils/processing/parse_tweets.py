@@ -42,7 +42,7 @@ default_columns = ['id', 'created_at', 'text', 'in_reply_to_status_id',
 
 def get_cache_location_from_fname(f_name, dtype):
     f_name_base = os.path.basename(f_name)
-    f_path_cache = get_cache_path(f'{f_name_base}.{dtype}.csv', subfolder='parse_tweets')
+    f_path_cache = get_cache_path(f'{f_name_base}.{dtype}.pkl', subfolder='parse_tweets')
     return f_path_cache
 
 def process_file(f_name, config):
@@ -123,11 +123,13 @@ def process_file(f_name, config):
     # writing cache file
     for dtype, df in all_data.items():
         f_path_cache = get_cache_location_from_fname(f_name, dtype)
-        if len(all_data[dtype]) == 0:
-            df = pd.DataFrame(columns=default_columns)
-        else:
-            df = pd.DataFrame(all_data[dtype])
-        df.to_csv(f_path_cache, index=False)
+        with open(f_path_cache, 'wb') as f:
+            pickle.dump(all_data[dtype], f)
+        # if len(all_data[dtype]) == 0:
+        #     df = pd.DataFrame(columns=default_columns)
+        # else:
+        #     df = pd.DataFrame(all_data[dtype])
+        # df.to_csv(f_path_cache, index=False)
 
 def get_used_files(output_path):
     f_name_used = os.path.join(output_path, f'.used_data')
@@ -165,7 +167,7 @@ def write_csv_in_parallel(df, f_name, no_parallel):
     parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
     logger.info('Merging csvs...')
     # write header
-    df = pd.DataFrame(columns=default_columns)
+    df = pd.DataFrame(columns=df.columns)
     df.to_csv(f_name, index=False)
     # concatenate file contents
     with open(f_name, 'a') as f:
@@ -291,7 +293,11 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             logger.info(f'Processing data type {t}')
             logger.info(f'Merging {len(data_files):,} cache files...')
             f_names = [get_cache_location_from_fname(f_name, t) for f_name in data_files]
-            df = pd.concat([pd.read_csv(f_name, dtype=dtypes) for f_name in tqdm(f_names)], sort=False)
+            all_data = []
+            for f_name in tqdm(f_names):
+                with open(f_name, 'rb') as f:
+                    all_data.append(pickle.load(f))
+            df = pd.DataFrame(all_data)
             if extend:
                 f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
                 if os.path.isfile(f_name):
