@@ -19,27 +19,8 @@ from utils.process_tweet import ProcessTweet
 import shutil
 import pickle
 
+
 logger = logging.getLogger(__name__)
-
-default_columns = ['id', 'created_at', 'text', 'in_reply_to_status_id',
-       'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count',
-       'lang', 'user.id', 'user.screen_name', 'user.name', 'user.location',
-       'user.followers_count', 'user.friends_count', 'entities.hashtags',
-       'entities.user_mentions', 'has_place', 'has_place_bounding_box',
-       'place.bounding_box.centroid', 'place.bounding_box.area',
-       'has_coordinates', 'is_retweet', 'retweeted_status.id',
-       'retweeted_status.user.id', 'retweeted_status.user.followers_count',
-       'retweeted_status.in_reply_to_status_id',
-       'retweeted_status.retweet_count', 'retweeted_status.favorite_count',
-       'has_quoted_status', 'quoted_status.has_media', 'quoted_status.media',
-       'quoted_status.id', 'quoted_status.text', 'quoted_status.user.id',
-       'quoted_status.user.followers_count',
-       'quoted_status.in_reply_to_status_id', 'quoted_status.retweet_count',
-       'quoted_status.favorite_count', 'has_media', 'media',
-       'media_image_urls', 'extracted_quoted_tweet', 'contains_keywords',
-       'token_count', 'text_hash', 'place.bounding_box', 'place.full_name',
-       'place.country_code', 'place.place_type']
-
 
 def get_cache_location_from_fname(f_name, dtype):
     f_name_base = os.path.basename(f_name)
@@ -126,11 +107,6 @@ def process_file(f_name, config):
         f_path_cache = get_cache_location_from_fname(f_name, dtype)
         with open(f_path_cache, 'wb') as f:
             pickle.dump(all_data[dtype], f)
-        # if len(all_data[dtype]) == 0:
-        #     df = pd.DataFrame(columns=default_columns)
-        # else:
-        #     df = pd.DataFrame(all_data[dtype])
-        # df.to_csv(f_path_cache, index=False)
 
 def get_used_files(output_path):
     f_name_used = os.path.join(output_path, f'.used_data')
