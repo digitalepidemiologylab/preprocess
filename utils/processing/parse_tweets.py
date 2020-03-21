@@ -17,6 +17,7 @@ import random
 from utils.helpers import get_cache_path, get_dtypes, get_project_info, cache_folder
 from utils.process_tweet import ProcessTweet
 import shutil
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +297,11 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             all_data = []
             for f_name in tqdm(f_names):
                 with open(f_name, 'rb') as f:
-                    all_data.append(pickle.load(f))
+                    try:
+                        d = pickle.load(f)
+                    except EOFError:
+                        continue
+                all_data.extend(d)
             df = pd.DataFrame(all_data)
             if extend:
                 f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
