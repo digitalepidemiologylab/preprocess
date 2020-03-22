@@ -1,4 +1,3 @@
-import sys;sys.path.append('../..')
 import pandas as pd
 import os
 from copy import copy
@@ -136,10 +135,12 @@ def write_csv_in_parallel(df, f_name, no_parallel):
     if no_parallel:
         num_cores = 1
     else:
-        num_cores = max(multiprocessing.cpu_count() - 1, 1)
+        # Optimized for 250 GB of RAM
+        num_cpus = max(multiprocessing.cpu_count() - 1, 1)
+        num_parallel_jobs = min(max(int(num_jobs/30), 1), num_cpus)
     cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
     logger.info(f'Writing {num_jobs} partial csvs in parallel...')
-    parallel = joblib.Parallel(n_jobs=num_cores)
+    parallel = joblib.Parallel(n_jobs=num_parallel_jobs)
     write_csv_delayed = joblib.delayed(write_csv)
     parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
     logger.info('Merging csvs...')
@@ -279,17 +280,18 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
                         continue
                 all_data.extend(d)
             df = pd.DataFrame(all_data)
+            del all_data  # release memory
+            df['created_at'] = pd.to_datetime(df['created_at'])
             if extend:
                 f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
                 if os.path.isfile(f_name):
                     logger.info(f'Merging with pre-existing data from {f_name}...')
-                    df = pd.concat([df, pd.read_csv(f_name, dtype=dtypes)], sort=False)
+                    df = pd.concat([df, pd.read_csv(f_name, dtype=dtypes, parse_dates=['created_at'])], sort=False)
             if len(df) == 0:
                 logger.warning(f'No data was collected for data type {t}')
                 continue
             logger.info(f'Collected {len(df):,} rows of data')
             logger.info('Sorting by column created_at...')
-            df['created_at'] = pd.to_datetime(df['created_at'])
             df.sort_values('created_at', inplace=True)
             stats[t]['original_counts'] = len(df)
             # Drop dulicates by ID
