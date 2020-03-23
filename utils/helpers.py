@@ -323,6 +323,44 @@ def read_raw_data_from_csv(f_path, dtype, frac=1, nrows=None, skiprows=None, use
         df.set_index(set_index, drop=True, inplace=True)
     return df
 
+def get_limited_cols():
+    return [
+        'id',
+        'created_at',
+        'text',
+        'in_reply_to_status_id',
+        'in_reply_to_user_id',
+        'lang',
+        'user.id',
+        'user.location',
+        'has_place',
+        'has_place_bounding_box',
+        'place.bounding_box.centroid',
+        'place.bounding_box.area',
+        'has_coordinates',
+        'is_retweet',
+        'retweeted_status.id',
+        'retweeted_status.user.id',
+        'retweeted_status.in_reply_to_status_id',
+        'has_quoted_status',
+        'quoted_status.id',
+        'quoted_status.text',
+        'quoted_status.user.id',
+        'quoted_status.in_reply_to_status_id',
+        'extracted_quoted_tweet',
+        'contains_keywords',
+        'token_count',
+        'text_hash',
+        'place.bounding_box',
+        'place.full_name',
+        'place.country_code',
+        'place.place_type',
+        'longitude',
+        'latitude',
+        'is_duplicate',
+        'use_for_labelling',
+        'use_for_prediction'
+       ]
 
 def get_dtypes(usecols=None):
     """Gets dtypes for columns"""

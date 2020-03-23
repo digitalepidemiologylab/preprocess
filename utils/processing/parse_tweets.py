@@ -13,7 +13,7 @@ import multiprocessing
 import joblib
 import logging
 import random
-from utils.helpers import get_cache_path, get_dtypes, get_project_info, cache_folder
+from utils.helpers import get_cache_path, get_dtypes, get_project_info, cache_folder, get_limited_cols
 from utils.process_tweet import ProcessTweet
 import shutil
 import pickle
@@ -130,31 +130,35 @@ def write_csv_in_parallel(df, f_name, no_parallel):
     num_rows = len(df)
     shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
     indices = range(0, num_rows, batch_size)
-    dfs = (df[s:(s+batch_size)] for s in indices)
     num_jobs = len(indices)
     if no_parallel:
-        num_cores = 1
+        num_parallel_jobs = 1
     else:
         # Optimized for 250 GB of RAM
-        num_cpus = max(multiprocessing.cpu_count() - 1, 1)
-        num_parallel_jobs = min(max(int(num_jobs/30), 1), num_cpus)
-    cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
-    logger.info(f'Writing {num_jobs} partial csvs in parallel...')
-    parallel = joblib.Parallel(n_jobs=num_parallel_jobs)
-    write_csv_delayed = joblib.delayed(write_csv)
-    parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
-    logger.info('Merging csvs...')
-    # write header
-    df = pd.DataFrame(columns=df.columns)
-    df.to_csv(f_name, index=False)
-    # concatenate file contents
-    with open(f_name, 'a') as f:
-        for cache_name in tqdm(cache_names):
-            shutil.copyfileobj(open(cache_name, 'r'), f)
-    logger.info('Cleanup...')
-    shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
+        num_cpus = min(max(multiprocessing.cpu_count() - 1, 1), num_jobs)  # make sure not to use more cores than jobs
+        num_parallel_jobs = min(max(int(num_jobs/30), 1), num_cpus)  # reduce by a factor so everything fits into memory
+    if num_parallel_jobs == 1:
+        logger.info('Writing CSV single threaded...')
+    else:
+        logger.info(f'Writing {num_jobs} CSVs using {num_parallel_jobs} parallel jobs...')
+        cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
+        parallel = joblib.Parallel(n_jobs=num_parallel_jobs)
+        write_csv_delayed = joblib.delayed(write_csv)
+        dfs = (df[s:(s+batch_size)] for s in indices)
+        parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
+        del dfs
+        logger.info('Merging csvs...')
+        # write header
+        df = pd.DataFrame(columns=df.columns)
+        df.to_csv(f_name, index=False)
+        # concatenate file contents
+        with open(f_name, 'a') as f:
+            for cache_name in tqdm(cache_names):
+                shutil.copyfileobj(open(cache_name, 'r'), f)
+        logger.info('Cleanup...')
+        shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
 
-def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, verbose=False):
+def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False):
     # setup
     s_time = time.time()
     # build config
@@ -257,7 +261,7 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
 
     # merge
     stats = defaultdict(dict)
-    dtypes = get_dtypes()
+    limited_columns = get_limited_cols()
     if extend:
         used_files = get_used_files(config.output_data_path)
         data_files = list(set(all_data_files) - set(used_files))
@@ -266,27 +270,33 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             return
     else:
         data_files = all_data_files
+
     for t in config.output_types:
         if config.output_types[t]:
             logger.info(f'Processing data type {t}')
             logger.info(f'Merging {len(data_files):,} cache files...')
             f_names = [get_cache_location_from_fname(f_name, t) for f_name in data_files]
-            all_data = []
-            for f_name in tqdm(f_names):
+            df = []
+            for i, f_name in tqdm(enumerate(f_names), total=len(f_names)):
                 with open(f_name, 'rb') as f:
                     try:
                         d = pickle.load(f)
                     except EOFError:
                         continue
-                all_data.extend(d)
-            df = pd.DataFrame(all_data)
-            del all_data  # release memory
+                if limited_cols:
+                    d = [{k: _d.get(k) for k in limited_columns if k in _d} for _d in d]
+                df.extend(d)
+            df = pd.DataFrame(df)
             df['created_at'] = pd.to_datetime(df['created_at'])
             if extend:
                 f_name = os.path.join(config.output_data_path, f'parsed_{t}.csv')
                 if os.path.isfile(f_name):
                     logger.info(f'Merging with pre-existing data from {f_name}...')
-                    df = pd.concat([df, pd.read_csv(f_name, dtype=dtypes, parse_dates=['created_at'])], sort=False)
+                    usecols = None
+                    if limited_cols:
+                        usecols = limited_columns
+                    dtypes = get_dtypes(usecols=usecols)
+                    df = pd.concat([df, pd.read_csv(f_name, dtype=dtypes, parse_dates=['created_at'], usecols=usecols)], sort=False)
             if len(df) == 0:
                 logger.warning(f'No data was collected for data type {t}')
                 continue
