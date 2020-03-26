@@ -137,28 +137,25 @@ def write_csv_in_parallel(df, f_name, no_parallel):
         # Optimized for 250 GB of RAM
         num_cpus = min(max(multiprocessing.cpu_count() - 1, 1), num_jobs)  # make sure not to use more cores than jobs
         num_parallel_jobs = min(max(int(num_jobs/30), 1), num_cpus)  # reduce by a factor so everything fits into memory
-    if num_parallel_jobs == 1:
-        logger.info('Writing CSV single threaded...')
-    else:
-        logger.info(f'Writing {num_jobs} CSVs using {num_parallel_jobs} parallel jobs...')
-        cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
-        parallel = joblib.Parallel(n_jobs=num_parallel_jobs)
-        write_csv_delayed = joblib.delayed(write_csv)
-        dfs = (df[s:(s+batch_size)] for s in indices)
-        parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
-        del dfs
-        logger.info('Merging csvs...')
-        # write header
-        df = pd.DataFrame(columns=df.columns)
-        df.to_csv(f_name, index=False)
-        # concatenate file contents
-        with open(f_name, 'a') as f:
-            for cache_name in tqdm(cache_names):
-                shutil.copyfileobj(open(cache_name, 'r'), f)
-        logger.info('Cleanup...')
-        shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
+    logger.info(f'Writing {num_jobs} CSVs using {num_parallel_jobs} parallel jobs...')
+    cache_names = [get_cache_path(f'partial_csv_{i}.csv', subfolder='partial-csv-write') for i in range(num_jobs)]
+    parallel = joblib.Parallel(n_jobs=num_parallel_jobs)
+    write_csv_delayed = joblib.delayed(write_csv)
+    dfs = (df[s:(s+batch_size)] for s in indices)
+    parallel((write_csv_delayed(_df, cache_names[i]) for i, _df in tqdm(enumerate(dfs), total=num_jobs)))
+    del dfs
+    logger.info('Merging csvs...')
+    # write header
+    df = pd.DataFrame(columns=df.columns)
+    df.to_csv(f_name, index=False)
+    # concatenate file contents
+    with open(f_name, 'a') as f:
+        for cache_name in tqdm(cache_names):
+            shutil.copyfileobj(open(cache_name, 'r'), f)
+    logger.info('Cleanup...')
+    shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
 
-def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False):
+def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False, num=None):
     # setup
     s_time = time.time()
     # build config
@@ -205,6 +202,8 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     parallel = joblib.Parallel(n_jobs=num_cores)
     process_file_delayed = joblib.delayed(process_file)
     all_data_files = sorted([f for f in glob.glob(os.path.join(config.input_data_path, '**', '*.json*'), recursive=True) if os.path.isfile(f)])
+    if num is not None:
+        all_data_files = all_data_files[:num]
     # extend
     if overwrite:
         files_to_cache = all_data_files

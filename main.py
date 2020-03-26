@@ -61,12 +61,13 @@ class ArgParse(object):
         parser.add_argument('-d', '--dtypes', choices=['original', 'anonymized', 'encrypted'], required=False, default=['anonymized'], nargs='+', help='Data source type to create. Anonymized replaces user mentions and URLs. Encrypted will encrypt certain fields (needs encryption key).')
         parser.add_argument('-f', '--formats', dest='formats', nargs='+', choices=['pkl', 'csv', 'json'], default=['csv'], help='Output formats (additional to h5).')
         parser.add_argument('-l', '--lang', default='en_core_web_sm', required=False, help='Spacy language model. This is used for word tokenization count.')
+        parser.add_argument('-n', '--num', default=None, required=False, type=int, help='Use first n cache files only')
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
         parser.add_argument('--extend', dest='extend', action='store_true', help='Do extend existing parsed data. Extend requires a pickle file to work properly.')
         parser.add_argument('--overwrite', dest='overwrite', action='store_true', help='Overwrite existing files')
         parser.add_argument('--limited-cols', dest='limited_cols', action='store_true', help='Only store most important columns (saves memory)')
         args = parser.parse_args(sys.argv[2:])
-        parse_tweets.run(dtypes=args.dtypes, formats=args.formats, lang=args.lang, no_parallel=args.no_parallel, overwrite=args.overwrite, extend=args.extend, limited_cols=args.limited_cols)
+        parse_tweets.run(dtypes=args.dtypes, formats=args.formats, lang=args.lang, no_parallel=args.no_parallel, overwrite=args.overwrite, extend=args.extend, limited_cols=args.limited_cols, num=args.num)
 
     def sample(self):
         import utils.processing.sample_tweets as sample_tweets
