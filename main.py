@@ -12,7 +12,7 @@ Available commands:
   batch            Creates a new batch of tweets from a sampled file in `/data/2_sampled`
   clean_labels     Clean labels generated from (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
-  split            Splits data into training and test data
+  split            Splits data into training, dev and test data
   sync             Sync project data from S3
 """
 
@@ -140,7 +140,7 @@ class ArgParse(object):
             stats(args.command)
 
     def split(self):
-        from utils.task_helpers import train_test_split
+        from utils.task_helpers import train_dev_test_split
         parser = ArgParseDefault(description='Split annotated data into training and test data set')
         parser.add_argument('--question', type=str, required=False, default='sentiment', help='Which data to load (has to be a valid question tag)')
         parser.add_argument('--name', type=str, required=False, default='', help='In case there are multiple cleaned labelled data output files give name of file (without csv ending), default: No name provided (works only if a single file is present).')
@@ -148,10 +148,11 @@ class ArgParse(object):
         parser.add_argument('--all-questions', dest='all_questions', action='store_true', default=False, help='Generate files for all available question tags. This overwrites the `question` argument. Default: False.')
         parser.add_argument('--label-tags', dest='label_tags', required=False, default=[], nargs='+', help='Only select examples with certain label tags')
         parser.add_argument('--has-label', dest='has_label', required=False, default='', help='Only select examples which have also been tagged with certain label')
+        parser.add_argument('--dev-size', dest='dev_size', type=float, required=False, default=0.2, help='Fraction of dev size')
         parser.add_argument('--test-size', dest='test_size', type=float, required=False, default=0.2, help='Fraction of test size')
         parser.add_argument('--seed', type=int, required=False, default=42, help='Random state split')
         args = parser.parse_args(sys.argv[2:])
-        train_test_split(question=args.question, test_size=args.test_size, seed=args.seed, name=args.name, balanced_labels=args.balanced_labels, all_questions=args.all_questions, label_tags=args.label_tags, has_label=args.has_label)
+        train_dev_test_split(question=args.question, dev_size=args.dev_size, test_size=args.test_size, seed=args.seed, name=args.name, balanced_labels=args.balanced_labels, all_questions=args.all_questions, label_tags=args.label_tags, has_label=args.has_label)
 
     def sync(self):
         from utils.task_helpers import sync

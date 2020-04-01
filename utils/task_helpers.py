@@ -6,7 +6,11 @@ from utils.helpers import find_folder, get_cleaned_labelled_data, get_project_in
 from utils.s3_helper import S3Helper
 from utils.stats import Stats
 from utils.misc import JSONEncoder
+import pandas as pd
+import numpy as np
+import glob
 
+logger = logging.getLogger(__name__)
 
 def init(project, template):
     project_fname = os.path.join(find_project_root(), 'project_info.json')
@@ -23,11 +27,8 @@ def init(project, template):
     s3_helper.sync_project_info(project)
 
 
-def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', balanced_labels=False, all_questions=False, label_tags=[], labelled_as=None, has_label=''):
-    import sklearn.model_selection
-    import pandas as pd
-
-    """Splits cleaned labelled data into training and test set"""
+def train_dev_test_split(question='sentiment', dev_size=0.1, test_size=0.2, seed=42, name='', balanced_labels=False, all_questions=False, label_tags=[], labelled_as=None, has_label=''):
+    """Splits cleaned labelled data into training, dev and test set"""
     def _filter_for_label_balance(df):
         """Performs undersampling for overrepresanted label classes"""
         counts = Counter(df['label'])
@@ -36,8 +37,16 @@ def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', bala
         for l in counts.keys():
             _df = pd.concat([_df, df[df['label'] == l].sample(min_count)])
         return _df
-    logger = logging.getLogger(__name__)
     questions = [question]
+    np.random.seed(seed)
+    if name == '':
+        f_path = os.path.join(find_folder('4_labels_cleaned'), 'cleaned_labels*.csv')
+        annotation_files = glob.glob(f_path)
+        if len(annotation_files) == 0:
+            raise FileNotFoundError(f'No cleaned label files could be found with the pattern {f_path}')
+        elif len(annotation_files) > 1:
+            raise ValueError(f'Found {len(annotation_files)} different files for cleaned labels. Provide "name" argument to specify which.')
+        name = os.path.basename(annotation_files[0]).split('.csv')[0]
     if all_questions:
         df = get_cleaned_labelled_data(name=name)
         questions = df['question_tag'].unique()
@@ -58,14 +67,14 @@ def train_test_split(question='sentiment', test_size=0.2, seed=42, name='', bala
             folder_path = os.path.join(find_folder('4_labels_cleaned'), 'other', has_label_flag, question)
         else:
             folder_path = os.path.join(find_folder('4_labels_cleaned'), 'splits', question)
-        train, test = sklearn.model_selection.train_test_split(df, test_size=test_size, random_state=seed, shuffle=True)
+        train, dev, test = np.split(df.sample(frac=1, random_state=seed), [int((1-dev_size-test_size)*len(df)), int((1-test_size)*len(df))])
         if not os.path.isdir(folder_path):
             os.makedirs(folder_path)
-        for dtype, data in [['train', train], ['test', test]]:
-            f_name = '{}_{}_split_{}_seed_{}{}.csv'.format(dtype, question, int(100*test_size), seed, flags)
+        for dtype, data in [['train', train], ['dev', dev], ['test', test]]:
+            f_name = f'{dtype}_{question}_split_{len(train)}_{len(dev)}_{len(test)}_seed_{seed}{flags}.csv'
             f_path = os.path.join(folder_path, f_name)
             data.to_csv(f_path, index=None, encoding='utf8')
-            logger.info('Successfully wrote data of {:,} examples to file {}.'.format(len(data), f_path))
+            logger.info(f'Successfully wrote data of {len(data):,} examples to file {f_path}.')
 
 def sync(data_type='all', last_n_days=None):
     project_info = get_project_info()

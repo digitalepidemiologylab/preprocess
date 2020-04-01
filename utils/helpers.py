@@ -79,6 +79,7 @@ def get_labelled_data(pattern='*', mode='*', usecols=None):
             logger.warning('The label dataset contains {:,} annotations without a question tag.'.format(null_question_tags))
     return df
 
+
 def get_cleaned_labelled_data(question=None, name='', cols=None, return_label_ids=False, has_label=''):
     """Read cleaned labelled data
     :param question: if int get quesiton_id, if string must be a valid question tag
