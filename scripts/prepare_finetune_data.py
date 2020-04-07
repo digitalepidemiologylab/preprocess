@@ -4,6 +4,7 @@ import sys
 sys.path.append('..')
 from utils.helpers import get_all_data, find_folder
 import logging
+import numpy as np
 
 
 def main(dtype='anonymized'):
@@ -29,10 +30,9 @@ def main(dtype='anonymized'):
     df = df[(~df.A) & (~df.is_duplicate) & (df.token_count >= 3) & (~df.is_retweet) & (df.contains_keywords)]
 
     # write output file
-    f_path = os.path.join(find_folder('1_parsed'), 'parsed_{}_finetune.csv'.format(dtype))
+    f_path = os.path.join(find_folder('1_parsed'), 'parsed_{}_finetune.txt'.format(dtype))
     logger.info('Writing {:,} lines to file {}...'.format(len(df), f_path))
-    df[['text']].to_csv(f_path, index=False)
-
+    np.savetxt(f_path, df.text.values)
 
 if __name__ == "__main__":
     main()
