@@ -42,10 +42,12 @@ def main(dtype='anonymized'):
     df.loc[:, 'text'] = df.text.apply(standardize_text)
 
     # generate text column to filter for duplicates
+    logger.info('Remove duplicates...')
     df.loc[:, 'text_cleared'] = df.text.apply(generate_text_cleared)
     df = df.drop_duplicates(subset=['text_cleared'])
 
     # shuffle
+    logger.info('Shuffle...')
     df = df.sample(frac=1)
 
     # write to train/dev file
