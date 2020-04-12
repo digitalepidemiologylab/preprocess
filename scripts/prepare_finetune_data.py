@@ -7,18 +7,18 @@ import logging
 from tqdm import tqdm
 import re
 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-5.5s] [%(name)-12.12s]: %(message)s')
+logger = logging.getLogger(__name__)
+
 transl_table = dict([(ord(x), ord(y)) for x, y in zip( u"‘’´“”–-",  u"'''\"\"--")])
 user_handle_regex = re.compile(r'(^|[^@\w])@(\w{1,15})\b')
 
 def main(dtype='anonymized'):
     """
-    This script creates a new file `data/1_parsed/parsed_{dtype}_finetune.csv` containing data to fine-tune a text classification model.
+    This script creates a new file `data/1_parsed/parsed_{dtype}_finetune{train/dev}.csv` containing data to fine-tune a text classification model.
     It excludes training data and duplicates.
     """
-    # logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-5.5s] [%(name)-12.12s]: %(message)s')
-    logger = logging.getLogger(__name__)
-
     # load data
     logger.info('Reading data...')
     usecols = ['id', 'text', 'is_duplicate', 'token_count', 'is_retweet', 'contains_keywords']
@@ -51,7 +51,7 @@ def main(dtype='anonymized'):
     # write to train/dev file
     num_lines = len(df)
     logger.info(f'Collected total of {num_lines:,} examples')
-    num_train = int(0.8*num_lines)
+    num_train = min(int(0.8*num_lines), int(2e5))
     for (_s, _e), _type in zip([(None, num_train), (num_train, None)], ['train', 'dev']):
         f_path = os.path.join(find_folder('1_parsed'), f'parsed_{dtype}_finetune_{_type}.txt')
         num_lines = len(df[_s:_e])

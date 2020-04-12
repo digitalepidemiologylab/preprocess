@@ -202,8 +202,6 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
     parallel = joblib.Parallel(n_jobs=num_cores)
     process_file_delayed = joblib.delayed(process_file)
     all_data_files = sorted([f for f in glob.glob(os.path.join(config.input_data_path, '**', '*.json*'), recursive=True) if os.path.isfile(f)])
-    if num is not None:
-        all_data_files = all_data_files[:num]
     # extend
     if overwrite:
         files_to_cache = all_data_files
@@ -269,6 +267,8 @@ def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=Fals
             return
     else:
         data_files = all_data_files
+    if num is not None:
+        data_files = data_files[:num]
 
     for t in config.output_types:
         if config.output_types[t]:
