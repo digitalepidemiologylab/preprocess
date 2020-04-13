@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import numpy as np
 import hashlib
 import pandas as pd
+import argparse
 
 @contextmanager
 def suppress_stdout():
@@ -29,3 +30,8 @@ class JSONEncoder(json.JSONEncoder):
 
 def get_df_hash(df):
     return hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
+
+class ArgParseDefault(argparse.ArgumentParser):
+    """Simple wrapper which shows defaults in help"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs, formatter_class=argparse.ArgumentDefaultsHelpFormatter)

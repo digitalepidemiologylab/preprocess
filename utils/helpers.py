@@ -244,7 +244,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=False, usecols=None, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
+def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=None, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
@@ -274,14 +274,15 @@ def get_all_data(include_all_data=False, usecols=None, extra_cols=None, dtype='a
     if e_date != '':
         df = df[df.index <= e_date]
     if include_flags:
-        df_sampled = get_uploaded_batched_data(mode=mode)
-        df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
-        df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
         # compute filters for sampling data
+        df_sampled = get_uploaded_batched_data(mode=mode)
         df['S'] = df.id.isin(df_sampled)
         # compute filters for annotation data
+        df_labelled = get_labelled_data(usecols=['tweet_id'], mode=mode)
         df['L'] = df.id.isin(df_labelled.tweet_id)
-        df['A'] = df.id.isin(df_cleaned_labels.id)
+        if include_cleaned_labels:
+            df_cleaned_labels = get_cleaned_labelled_data(name='*', cols=['id'])
+            df['A'] = df.id.isin(df_cleaned_labels.id)
     if geo_enrichment_type is not None:
         cache_path = get_cache_path(f'geonames_enriched_{dtype}.pkl')
         df_geo = pd.read_pickle(cache_path)

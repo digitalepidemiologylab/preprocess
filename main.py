@@ -1,6 +1,7 @@
 import argparse
 import sys, os
 import logging
+from utils.misc import ArgParseDefault
 
 USAGE_DESC = """
 python main.py <command> [<args>]
@@ -27,11 +28,6 @@ Available commands:
   annotation_cleaned  Show cleaned annotation summary
   annotator_outliers  Show annotator outliers
 """
-
-class ArgParseDefault(argparse.ArgumentParser):
-    """Simple wrapper which shows defaults in help"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 class ArgParse(object):
     def __init__(self):
