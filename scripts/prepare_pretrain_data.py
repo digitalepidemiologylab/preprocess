@@ -5,9 +5,11 @@ sys.path.append('..')
 from utils.helpers import get_all_data, find_folder
 from utils.misc import ArgParseDefault
 import logging
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import re
-import argparse
+import joblib
+import multiprocessing
+import datetime
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-5.5s] [%(name)-12.12s]: %(message)s')
@@ -18,13 +20,13 @@ user_handle_regex = re.compile(r'(^|[^@\w])@(\w{1,15})\b')
 
 def main(args):
     """
-    This script creates a new file `data/1_parsed/parsed_{dtype}_finetune{train/dev}.csv` containing data to fine-tune a text classification model.
+    This script creates a new files in preprocess/data/other/pretrain with tweets which should be used for pretraining language models.
     It excludes training data and duplicates.
     """
     # load data
     logger.info('Reading data...')
     usecols = ['id', 'text', 'lang', 'is_duplicate', 'token_count', 'is_retweet', 'contains_keywords']
-    df = get_all_data(dtype=args.dtype, include_flags=True, include_predictions=False, include_cleaned_labels=False, usecols=usecols)
+    df = get_all_data(dtype=args.dtype, include_flags=True, include_predictions=False, include_cleaned_labels=False, usecols=usecols, nrows=args.nrows)
     logger.info(f'...loaded a total of {len(df):,} tweets')
 
     filters = {'contains_keywords': 'contains_keywords'}
@@ -75,17 +77,35 @@ def main(args):
     logger.info('Shuffle...')
     df = df.sample(frac=1)
 
-    # write to train/dev file
+    # write output file
     num_lines = len(df)
     logger.info(f'Collected total of {num_lines:,} examples')
     num_train = max(int(0.8*num_lines), num_lines - int(2e5))
+    ts = datetime.datetime.now().strftime('%Y_%m_%d-%H-%M_%s')
     for (_s, _e), _type in zip([(None, num_train), (num_train, None)], ['train', 'dev']):
-        f_path = os.path.join(find_folder('1_parsed'), f'parsed_{args.dtype}_pretrain_{_type}.txt')
-        num_lines = len(df[_s:_e])
-        logger.info(f'Writing {num_lines:,} examples to file {f_path}...')
-        with open(f_path, 'w') as f:
-            for i, text in tqdm(df[_s:_e].text.iteritems(), total=num_lines):
-                f.write(text + '\n')
+        _df = df[_s:_e]
+        logger.info(f'Writing {len(_df):,} examples for {_type} data...')
+        output_folder = os.path.join(find_folder('other'), 'pretrain', f'run_{ts}', _type)
+        if not os.path.isdir(output_folder):
+            os.makedirs(output_folder)
+        if args.no_parallel:
+            num_cpus = 1
+        else:
+            num_cpus = max(multiprocessing.cpu_count() - 1, 1)
+        parallel = joblib.Parallel(n_jobs=num_cpus)
+        write_output_file_delayed = joblib.delayed(write_output_file)
+        res = parallel((write_output_file_delayed(
+            _df.iloc[i:(i+args.max_examples_per_file)], 
+            os.path.join(output_folder, f'pretrain_{args.dtype}_{_type}_{j:03}.txt')
+            ) for j, i in enumerate(trange(0, len(_df), args.max_examples_per_file))))
+        logger.info(f'Successfully wrote {len(res):,} file(s) to folder {output_folder}')
+
+def write_output_file(df, f_path):
+    with open(f_path, 'w') as f:
+        num_lines = len(df)
+        for i, text in tqdm(df.text.iteritems(), total=num_lines):
+            f.write(text + '\n')
+    return 1
 
 def generate_text_cleared(text):
     # Remove RT @<user>, @<user> and <url>
@@ -106,10 +126,8 @@ def standardize_text(text):
     return text
 
 def replace_user_handles(text):
-    # text = re.sub(r'(^|[^@\w])@(\w{1,15})\b', '@<user>', text)
     text = re.sub(user_handle_regex, '@<user>', text)
     return text
-
 
 def parse_args():
     parser = ArgParseDefault()
@@ -117,6 +135,9 @@ def parse_args():
     parser.add_argument('--dtype', default='anonymized', choices=['original', 'anonymized', 'encrypted'], help="Data type")
     parser.add_argument('--lang', default='en', help="Filter language")
     parser.add_argument('--min_tokens', default=3, help="Min num tokens")
+    parser.add_argument('--max_examples_per_file', default=int(1e6), type=int, help="Max examples per file")
+    parser.add_argument('--nrows', default=None, type=int, help="Only read n rows from file")
+    parser.add_argument('--no_parallel', action='store_true', default=False, help='Do not run in parallel')
     args = parser.parse_args()
     return args
 
