@@ -155,44 +155,59 @@ def write_csv_in_parallel(df, f_name, no_parallel):
     logger.info('Cleanup...')
     shutil.rmtree(cache_folder(subfolder='partial-csv-write'))
 
-def run(dtypes=['original'], formats=[], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False, num=None):
+
+def generate_file_list():
+    """generates dictionary of files per day"""
+    glob.glob()
+
+def run(dtypes=['original'], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False):
     # setup
     s_time = time.time()
-    # build config
-    config = DefaultMunch(None)
-    config.input_data_path = os.path.join('data', '0_raw')
-    config.output_data_path = os.path.join('data', '1_parsed')
-    # fields to keep
-    config.keep_fields = ['id', 'created_at', 'text', 'in_reply_to_status_id', 'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count', 'lang']
-    config.keep_fields_user = ['id', 'screen_name', 'name', 'location', 'followers_count', 'friends_count']
-    config.keep_fields_entities = ['hashtags', 'user_mentions']
-    config.keep_fields_place = ['bounding_box', 'full_name', 'country_code', 'place_type']
-    config.keep_fields_quoted_status = ['quoted_status.id', 'quoted_status.text', 'quoted_status.user.id', 'quoted_status.user.followers_count','quoted_status.in_reply_to_status_id', 'quoted_status.retweet_count', 'quoted_status.favorite_count']
-    config.keep_fields_retweeted_status = ['retweeted_status.id', 'retweeted_status.user.id', 'retweeted_status.user.followers_count', 'retweeted_status.in_reply_to_status_id', 'retweeted_status.retweet_count', 'retweeted_status.favorite_count']
-    config.encrypt_fields = DefaultMunch.fromDict({'entities.user_mentions': list, 'id': str, 'in_reply_to_status_id': str, 
-                      'in_reply_to_user_id': str, 'user.id': str, 'user.screen_name': str, 'user.name': str,
-                      'entities.user_mentions': list, 'retweeted_status.id': str, 'retweeted_status.user.id': str, 'retweeted_status.in_reply_to_status_id': str,
-                      'quoted_status.id': str, 'quoted_status.user.id': str, 'quoted_status.in_reply_to_status_id': str}, None)
+    input_path = os.path.join('data', '0_raw')
+    output_path = os.path.join('data', '1_parsed')
+    # get project info
     project_info = get_project_info()
-    config.keywords = project_info['keywords']
-    config.lang = lang
-    # params
-    config.output_types = DefaultMunch.fromDict({dtype: True for dtype in dtypes}, False)
-    # make sure encryption key is set
-    if config.output_types.encrypted:
+    # set up encrypted
+    if 'encrypted' in dtypes:
         Encrypt.verify_encryption_key()
+    # parallel
+    if no_parallel:
+        num_cores = 1
+    else:
+        num_cores = max(multiprocessing.cpu_count() - 1, 1)
+
+
+    f_names = generate_file_list()
+    # check for overwrite
+    # if not overwrite and not extend:
+    #     for t in output_types:
+    #         f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
+    #         if os.path.isfile(f_name):
+    #             raise Exception(f'File {f_name} already exists! Provide --overwrite flag or --extend flag (or remove file)')
+
+
+
+def run(dtypes=['original'], lang='en_core_web_sm', no_parallel=False, overwrite=False, extend=False, limited_cols=False):
+    # setup
+    s_time = time.time()
+    # fields to keep
+    # config.keep_fields = ['id', 'created_at', 'text', 'in_reply_to_status_id', 'in_reply_to_user_id', 'reply_count', 'retweet_count', 'favorite_count', 'lang']
+    # config.keep_fields_user = ['id', 'screen_name', 'name', 'location', 'followers_count', 'friends_count']
+    # config.keep_fields_entities = ['hashtags', 'user_mentions']
+    # config.keep_fields_place = ['bounding_box', 'full_name', 'country_code', 'place_type']
+    # config.keep_fields_quoted_status = ['quoted_status.id', 'quoted_status.text', 'quoted_status.user.id', 'quoted_status.user.followers_count','quoted_status.in_reply_to_status_id', 'quoted_status.retweet_count', 'quoted_status.favorite_count']
+    # config.keep_fields_retweeted_status = ['retweeted_status.id', 'retweeted_status.user.id', 'retweeted_status.user.followers_count', 'retweeted_status.in_reply_to_status_id', 'retweeted_status.retweet_count', 'retweeted_status.favorite_count']
+    # config.encrypt_fields = DefaultMunch.fromDict({'entities.user_mentions': list, 'id': str, 'in_reply_to_status_id': str, 
+    #                   'in_reply_to_user_id': str, 'user.id': str, 'user.screen_name': str, 'user.name': str,
+    #                   'entities.user_mentions': list, 'retweeted_status.id': str, 'retweeted_status.user.id': str, 'retweeted_status.in_reply_to_status_id': str,
+    #                   'quoted_status.id': str, 'quoted_status.user.id': str, 'quoted_status.in_reply_to_status_id': str}, None)
+    # make sure encryption key is set
+    # if config.output_types.encrypted:
     # run
     if no_parallel:
         num_cores = 1
     else:
         num_cores = max(multiprocessing.cpu_count() - 1, 1)
-    # check for overwrite
-    if not overwrite and not extend:
-        for t in config.output_types:
-            for fmt in formats:
-                f_name = os.path.join(config.output_data_path, f'parsed_{t}.{fmt}')
-                if os.path.isfile(f_name):
-                    raise Exception(f'File {f_name} already exists! Provide --overwrite flag or --extend flag (or remove file)')
     # check for extend
     if extend:
         for t in config.output_types:
