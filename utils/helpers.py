@@ -413,12 +413,13 @@ def get_dtypes(usecols=None):
             'retweeted_status.user.followers_count': 'Int64',
             'retweeted_status.user.id': str,
             'text': str,
-            'user.followers_count': 'Int64',
-            'user.friends_count': 'Int64',
+            'user.num_followers': 'Int64',
+            'user.num_following': 'Int64',
             'user.id': str,
             'user.location': str,
             'user.name': str,
             'user.screen_name': str,
+            'user.created_at': str,
             'is_duplicate': bool,
             'token_count': 'Int64',
             'use_for_labelling': bool,
@@ -474,7 +475,10 @@ def get_project_info():
             raise ValueError('Key `{}` in project info file should be of type {}'.format(required_key, f_type))
     return project_info
 
-def find_project_root(num_par_dirs=8):
+def find_project_root():
+    return os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..'))
+
+def find_git_root(num_par_dirs=8):
     for i in range(num_par_dirs):
         par_dirs = i*['..']
         current_dir = os.path.join(*par_dirs, '.git')

@@ -1,0 +1,3 @@
+[submodule "local_geocode"]
+	path = local_geocode
+	url = git@github.com:mar-muel/local-geocode.git
