@@ -38,13 +38,18 @@ def generate_file_list():
     f_names = glob.glob(output_path)
     grouped_f_names = defaultdict(list)
     for f_name in f_names:
-        date_str = f_name.split('-')[1]
+        if 'search_fullarchive' in f_name or 'search_30day' in f_name:
+            date_str = f_name.split('_')[-1].split('.')[0]
+        else:
+            try:
+                date_str = f_name.split('-')[1]
+            except:
+                __import__('pdb').set_trace()
         day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime('%Y-%m-%d')
         grouped_f_names[day_str].append(f_name)
     return grouped_f_names
 
 def extract_tweets(day, f_names, project_info):
-    count = 0
     gc = Geocode()
     gc.init()
     map_data = load_map_data()
@@ -58,11 +63,10 @@ def extract_tweets(day, f_names, project_info):
     def write_to_file(obj):
         with open(f_out, 'a') as f:
             f.write(json.dumps(obj) + '\n')
+    collected_ids = set()
     for f_name in f_names:
         with open(f_name, 'r') as f:
-            num_lines = sum(1 for line in f)
-            f.seek(0)
-            for line in tqdm(f, total=num_lines):
+            for line in f:
                 if len(line) <= 1:
                     continue
                 try:
@@ -78,23 +82,28 @@ def extract_tweets(day, f_names, project_info):
                 if 'info' in tweet:
                     continue  # API log fields (can be ignored)
                 pt = ProcessTweet(tweet=tweet, project_info=project_info, map_data=map_data, gc=gc)
+                # add interaction counts
+                if pt.is_reply:
+                    tweet_interaction_counts[pt.replied_status_id]['num_replies'] += 1
                 if pt.is_retweet:
                     tweet_interaction_counts[pt.retweeted_status_id]['num_retweets'] += 1
                 if pt.has_quoted_status:
-                    tweet_interaction_counts[pt.quoted_status_id]['num_quotes'] += 1
-                if pt.is_reply:
-                    tweet_interaction_counts[pt.replied_status_id]['num_replies'] += 1
-                # extract tweet/retweet/replies
+                    tweet_interaction_counts[pt.quoted_status_id]['num_retweets'] += 1
                 extracted_tweet = pt.extract()
-                text_hash =  pt.get_text_hash()
+                collected_ids.add(pt.id)
                 write_to_file(extracted_tweet)
-                count +=1
-                if pt.has_quoted_status:
-                    # extract quoted status
-                    pt = ProcessTweet(tweet=tweet['quoted_status'], project_info=project_info, map_data=map_data, gc=gc)
-                    extracted_tweet = pt.extract()
+                if pt.is_retweet and tweet['retweeted_status']['id_str'] not in collected_ids:
+                    # extract retweet
+                    pt_retweet = ProcessTweet(tweet=tweet['retweeted_status'], project_info=project_info, map_data=map_data, gc=gc)
+                    extracted_tweet = pt_retweet.extract()
                     write_to_file(extracted_tweet)
-                    count +=1
+                    collected_ids.add(pt_retweet.id)
+                if pt.has_quoted_status and tweet['quoted_status']['id_str'] not in collected_ids:
+                    # extract quoted status
+                    pt_quoted = ProcessTweet(tweet=tweet['quoted_status'], project_info=project_info, map_data=map_data, gc=gc)
+                    extracted_tweet = pt_quoted.extract()
+                    write_to_file(extracted_tweet)
+                    collected_ids.add(pt_quoted.id)
     return tweet_interaction_counts, f_out
 
 def write_parquet_file(output_file, interaction_counts):

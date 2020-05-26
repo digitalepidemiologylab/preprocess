@@ -189,7 +189,7 @@ class ProcessTweet():
             else:
                 dist = self.map_data.geometry.apply(lambda poly: poly.distance(coordinates))
                 closest_country = self.map_data.iloc[dist.argmin()].ISO_A2
-                logger.warning(f'Coordinates {longitude}, {latitude} were outside of area but closest to {closest_country}')
+                logger.warning(f'Coordinates {longitude}, {latitude} were outside of a country land area but were matched to closest country ({closest_country})')
                 return closest_country
 
         def convert_to_polygon(s):
