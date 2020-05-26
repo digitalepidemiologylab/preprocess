@@ -110,7 +110,7 @@ class ProcessTweet():
         ts = pd.to_datetime(date)
         return ts.isoformat()
 
-    def extract(self, is_quoted_status=False):
+    def extract(self, tweet_type='original'):
         geo_obj = self.get_geo_info()
         return {
                 'id': self.id,
@@ -132,8 +132,8 @@ class ProcessTweet():
                 'user.is_verified': self.is_verified,
                 'lang': self.tweet['lang'],
                 'token_count': self.get_token_count(),
-                'is_retweet': self.is_retweet,
-                'is_quoted_status': is_quoted_status,
+                'is_retweet': tweet_type == 'retweet',
+                'is_quote': tweet_type == 'quote',
                 'is_reply': self.is_reply,
                 'contains_keywords': self.contains_keywords(),
                 **geo_obj
