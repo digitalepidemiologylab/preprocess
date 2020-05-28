@@ -6,6 +6,7 @@ import numpy as np
 import hashlib
 import pandas as pd
 import argparse
+import fcntl
 
 @contextmanager
 def suppress_stdout():
@@ -35,3 +36,13 @@ class ArgParseDefault(argparse.ArgumentParser):
     """Simple wrapper which shows defaults in help"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+@contextmanager
+def file_lock(fd):
+    """ Locks FD before entering the context, always releasing the lock. """
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
