@@ -170,6 +170,7 @@ def run(lang='en_core_web_sm', no_parallel=False):
     res = parallel((extract_tweets_delayed(key, f_names, project_info) for key, f_names in tqdm(grouped_f_names.items())))
     logger.info('Merging all interaction counts...')
     interaction_counts = merge_interaction_counts(res)
+    res = None  # release memory
 
     # add interaction data to tweets and write compressed parquet dataframes
     logger.info('Writing parquet files...')
@@ -190,3 +191,4 @@ def run(lang='en_core_web_sm', no_parallel=False):
 
     e_time = time.time()
     logger.info(f'Finished in {(e_time-s_time)/60:.1f} min')
+
