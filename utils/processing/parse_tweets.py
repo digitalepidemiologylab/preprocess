@@ -47,9 +47,7 @@ def generate_file_list():
     for f_name in f_names:
         date_str = f_name.split('-')[1]
         day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime('%Y-%m-%d')
-        if len(grouped_f_names[day_str]) == 0:
-            grouped_f_names[day_str].append(f_name) == 0
-        break
+        grouped_f_names[day_str].append(f_name) == 0
     return grouped_f_names
 
 def extract_tweets(day, f_names, project_info):
@@ -116,8 +114,6 @@ def extract_tweets(day, f_names, project_info):
                 extracted_tweet = pt_quoted.extract(tweet_type='quote')
                 write_to_file(extracted_tweet)
                 collected_ids.add(pt_quoted.id)
-            if i > 10:
-                break
         f.close()
     return tweet_interaction_counts
 
