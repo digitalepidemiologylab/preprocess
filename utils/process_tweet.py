@@ -36,8 +36,16 @@ class ProcessTweet():
         return self.tweet['retweeted_status']['id_str']
 
     @property
+    def retweeted_user_id(self):
+        return self.tweet['retweeted_status']['user']['id_str']
+
+    @property
     def quoted_status_id(self):
         return self.tweet['quoted_status']['id_str']
+
+    @property
+    def quoted_user_id(self):
+        return self.tweet['quoted_status']['user']['id_str']
 
     @property
     def replied_status_id(self):
@@ -52,7 +60,7 @@ class ProcessTweet():
         return 'retweeted_status' in self.tweet
 
     @property
-    def has_quoted_status(self):
+    def has_quote(self):
         return 'quoted_status' in self.tweet
 
     @property
@@ -117,6 +125,10 @@ class ProcessTweet():
                 'text': self.get_text(),
                 'in_reply_to_status_id': self.replied_status_id,
                 'in_reply_to_user_id': self.replied_user_id,
+                'quoted_user_id': self.quoted_user_id if self.has_quote else None,
+                'quoted_status_id': self.quoted_status_id if self.has_quote else None,
+                'retweeted_user_id': self.retweeted_user_id if self.is_retweet else None,
+                'retweeted_status_id': self.retweeted_status_id if self.is_retweet else None,
                 'created_at': self.convert_to_iso_time(self.tweet['created_at']),
                 'entities.user_mentions': self.get_user_mentions(),
                 'user.id': self.user_id,
@@ -132,8 +144,8 @@ class ProcessTweet():
                 'user.is_verified': self.is_verified,
                 'lang': self.tweet['lang'],
                 'token_count': self.get_token_count(),
-                'is_retweet': tweet_type == 'retweet',
-                'is_quote': tweet_type == 'quote',
+                'is_retweet': self.is_retweet,
+                'has_quote': self.has_quote,
                 'is_reply': self.is_reply,
                 'contains_keywords': self.contains_keywords(),
                 **geo_obj
