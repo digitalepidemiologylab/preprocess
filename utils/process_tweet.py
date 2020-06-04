@@ -18,12 +18,15 @@ nlp = spacy.load('en_core_web_sm')
 class ProcessTweet():
     """Wrapper class for functions to process/modify tweets"""
 
-    def __init__(self, tweet=None, project_info=None, map_data=None, gc=None):
+    def __init__(self, tweet=None, keywords=None, map_data=None, gc=None):
         self.tweet = tweet
         self.extended_tweet = self._get_extended_tweet()
         self.html_parser = HTMLParser()
         self.control_char_regex = r'[\r\n\t]+'
-        self.project_info = project_info
+        if keywords is None:
+            self.keywords = []
+        else:
+            self.keywords = keywords
         self.map_data = map_data
         self.gc = gc
 
@@ -329,6 +332,8 @@ class ProcessTweet():
         "Specifically, the text attribute of the Tweet, expanded_url and display_url for links and media, text for hashtags, and screen_name for user mentions are checked for matches."
         https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html
         """
+        if len(self.keywords) == 0:
+            return False
         # anything which is inside text (user_mentions, hashtags etc.) will be tested for a raw match
         any_match_text = ''
         if search_text:
@@ -340,7 +345,7 @@ class ProcessTweet():
         if search_urls:
             separator_match_text += self._fetch_urls()
             separator_match_text = separator_match_text.lower()
-        for keyword in self.project_info['keywords']:
+        for keyword in self.keywords:
             m = re.search(r'{}'.format(keyword), any_match_text)
             if m is not None:
                 return True

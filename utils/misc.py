@@ -46,3 +46,8 @@ def file_lock(fd):
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
 
+def add_bool_arg(parser, name, default=False, help=''):
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument('--' + name, dest=name, action='store_true', help=help)
+    group.add_argument('--do_not_' + name, dest=name, action='store_false')
+    parser.set_defaults(**{name: default})

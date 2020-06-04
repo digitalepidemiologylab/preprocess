@@ -1,4 +1,5 @@
 import pandas as pd
+from pathlib import Path
 import numpy as np
 import os
 from collections import defaultdict
@@ -19,6 +20,7 @@ from local_geocode.geocode.geocode import Geocode
 import shutil
 import pickle
 import gzip
+import bz2
 
 
 logger = logging.getLogger(__name__)
@@ -50,13 +52,16 @@ def write_used_files(data_files):
 def generate_file_list():
     """generates dictionary of files per day"""
     f_names = []
-    for file_type in ['jsonl', 'gz']:
-        globbed = glob.glob(os.path.join(input_folder, '**', f'*.{file_type}'))
-        f_names.extend(globbed)
+    for file_type in ['jsonl', 'gz', 'bz2']:
+        globbed = Path(input_folder).rglob(f'*.{file_type}')
+        f_names.extend([str(g) for g in globbed])
     grouped_f_names = defaultdict(list)
     for f_name in f_names:
-        date_str = f_name.split('-')[1]
-        day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime('%Y-%m-%d')
+        if len(f_name.split('/')) < 3:
+            date_str = f_name.split('-')[1]
+            day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime('%Y-%m-%d')
+        else:
+             day_str = '-'.join(f_name.split('/')[-5:-2])
         grouped_f_names[day_str].append(f_name)
     return grouped_f_names
 
@@ -109,8 +114,8 @@ def dump_interaction_counts(interaction_counts):
         pickle.dump(dict(interaction_counts), f)
     return f_name
 
-def run(lang='en_core_web_sm', no_parallel=False):
-    def extract_tweets(day, f_names, project_info):
+def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True):
+    def extract_tweets(day, f_names, keywords):
         gc = Geocode()
         gc.init()
         map_data = load_map_data()
@@ -128,6 +133,8 @@ def run(lang='en_core_web_sm', no_parallel=False):
         for f_name in f_names:
             if f_name.endswith('.gz'):
                 f = gzip.open(f_name, 'r')
+            elif f_name.endswith('.bz2'):
+                f = bz2.BZ2File(f_name, 'r')
             else:
                 f = open(f_name, 'r')
             for i, line in enumerate(f):
@@ -143,18 +150,21 @@ def run(lang='en_core_web_sm', no_parallel=False):
                     logger.error('Error parsing line:')
                     logger.error(line)
                     continue
-                if 'info' in tweet:
-                    continue  # API log fields (can be ignored)
+                if not 'id' in tweet:
+                    continue  # API logs, error messages, etc.
                 tweet_id = tweet['id_str']
                 if tweet_id in originals:
                     # skip duplicates
                     continue
-                # create new entry in interaction counts
+                # flag tweet ID as "used"
                 originals[tweet_id] = True
                 # extract tweet
-                pt = ProcessTweet(tweet=tweet, project_info=project_info, map_data=map_data, gc=gc)
-                extracted_tweet = pt.extract()
-                write_to_file(extracted_tweet)
+                pt = ProcessTweet(tweet=tweet, keywords=keywords, map_data=map_data, gc=gc)
+                if ((extract_retweets and pt.is_retweet)                              # extract retweets (optional)
+                        or (extract_quotes and pt.has_quote and not pt.is_retweet)    # extract quotes if not retweet of a quote (optional)
+                        or (not pt.is_retweet and not pt.has_quote)):                 # always extract original tweets which are neither retweets nor quotes
+                    extracted_tweet = pt.extract()
+                    write_to_file(extracted_tweet)
                 # add interaction counts
                 if pt.is_reply:
                     if pt.replied_status_id in replies_counts:
@@ -162,18 +172,19 @@ def run(lang='en_core_web_sm', no_parallel=False):
                     else:
                         replies_counts[pt.replied_status_id] = 1
                 if pt.has_quote:
-                    pt = ProcessTweet(tweet=tweet['quoted_status'], project_info=project_info, map_data=map_data, gc=gc)
-                    if pt.id in quote_counts:
-                        quote_counts[pt.id] += 1
-                    else:
-                        quote_counts[pt.id] = 1
+                    pt = ProcessTweet(tweet=tweet['quoted_status'], keywords=keywords, map_data=map_data, gc=gc)
+                    if not pt.is_retweet:
+                        if pt.id in quote_counts:
+                            quote_counts[pt.id] += 1
+                        else:
+                            quote_counts[pt.id] = 1
                     if not pt.id in originals:
                         # extract original status
                         originals[pt.id] = True
                         extracted_tweet = pt.extract()
                         write_to_file(extracted_tweet)
                 if pt.is_retweet:
-                    pt = ProcessTweet(tweet=tweet['retweeted_status'], project_info=project_info, map_data=map_data, gc=gc)
+                    pt = ProcessTweet(tweet=tweet['retweeted_status'], keywords=keywords, map_data=map_data, gc=gc)
                     if pt.id in retweet_counts:
                         retweet_counts[pt.id] += 1
                     else:
@@ -186,7 +197,12 @@ def run(lang='en_core_web_sm', no_parallel=False):
             f.close()
     # setup
     s_time = time.time()
-    project_info = get_project_info()
+    try:
+        project_info = get_project_info()
+        keywords = project_info['keywords']
+    except FileNotFoundError:
+        logger.warning('Could not find project info file. Will not compute matching keywords')
+        keywords = []
 
     # collect file list
     grouped_f_names = generate_file_list()
@@ -206,7 +222,7 @@ def run(lang='en_core_web_sm', no_parallel=False):
     # run
     logger.info('Extract tweets...')
     extract_tweets_delayed = joblib.delayed(extract_tweets)
-    parallel(extract_tweets_delayed(key, f_names, project_info) for key, f_names in tqdm(grouped_f_names.items()))
+    parallel(extract_tweets_delayed(key, f_names, keywords) for key, f_names in tqdm(grouped_f_names.items()))
     logger.info('Merging all interaction counts...')
     interaction_counts = merge_interaction_counts()
     interaction_counts_fname = dump_interaction_counts(interaction_counts)
@@ -232,4 +248,4 @@ def run(lang='en_core_web_sm', no_parallel=False):
         logger.info('Cleaning up counts file...')
         os.remove(interaction_counts_fname)
     e_time = time.time()
-    logger.info(f'Finished in {(e_time-s_time)/60:.1f} min')
+    logger.info(f'Finished in {(e_time-s_time)/3600:.1f} hours')
