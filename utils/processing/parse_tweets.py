@@ -172,27 +172,27 @@ def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract
                     else:
                         replies_counts[pt.replied_status_id] = 1
                 if pt.has_quote:
-                    pt = ProcessTweet(tweet=tweet['quoted_status'], keywords=keywords, map_data=map_data, gc=gc)
+                    pt_quote = ProcessTweet(tweet=tweet['quoted_status'], keywords=keywords, map_data=map_data, gc=gc)
                     if not pt.is_retweet:
-                        if pt.id in quote_counts:
-                            quote_counts[pt.id] += 1
+                        if pt_quote.id in quote_counts:
+                            quote_counts[pt_quote.id] += 1
                         else:
-                            quote_counts[pt.id] = 1
-                    if not pt.id in originals:
+                            quote_counts[pt_quote.id] = 1
+                    if not pt_quote.id in originals:
                         # extract original status
-                        originals[pt.id] = True
-                        extracted_tweet = pt.extract()
+                        originals[pt_quote.id] = True
+                        extracted_tweet = pt_quote.extract()
                         write_to_file(extracted_tweet)
                 if pt.is_retweet:
-                    pt = ProcessTweet(tweet=tweet['retweeted_status'], keywords=keywords, map_data=map_data, gc=gc)
-                    if pt.id in retweet_counts:
-                        retweet_counts[pt.id] += 1
+                    pt_retweet = ProcessTweet(tweet=tweet['retweeted_status'], keywords=keywords, map_data=map_data, gc=gc)
+                    if pt_retweet.id in retweet_counts:
+                        retweet_counts[pt_retweet.id] += 1
                     else:
-                        retweet_counts[pt.id] = 1
-                    if pt.id not in originals:
+                        retweet_counts[pt_retweet.id] = 1
+                    if pt_retweet.id not in originals:
                         # extract original status
-                        originals[pt.id] = True
-                        extracted_tweet = pt.extract()
+                        originals[pt_retweet.id] = True
+                        extracted_tweet = pt_retweet.extract()
                         write_to_file(extracted_tweet)
             f.close()
     # setup
