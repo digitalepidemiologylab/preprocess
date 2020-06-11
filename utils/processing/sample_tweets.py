@@ -9,12 +9,14 @@ from random import randint
 import sys
 import glob
 import logging
+from utils.process_tweet import ProcessTweet
+
+logger = logging.getLogger(__name__)
 
 class SampleGenerator(object):
     """Class for generating samples from tweet corpus"""
 
     def __init__(self, seed=None):
-        self.logger = logging.getLogger(__name__)
         if seed is None:
             self.seed = randint(0,2**32-1)
         else:
@@ -81,9 +83,9 @@ class SampleGenerator(object):
         self.sample = sample
         return sample
 
-    def write_sample(self, sample, dtype, mode, columns=['id','text'], size='', min_date=None, max_date=None, flags=''):
+    def write_sample(self, sample, mode, columns=['id','text'], size='', min_date=None, max_date=None, flags=''):
         if len(sample) == 0:
-            self.logger.warn('No sample files written. Aborting.')
+            logger.warn('No sample files written. Aborting.')
             return
         timestamp = time.strftime('%Y-%m-%d_%H-%M-%S')
         min_date_str = ''
@@ -92,10 +94,10 @@ class SampleGenerator(object):
         max_date_str = ''
         if max_date is not None:
             max_date_str = '_max_date_{}'.format(max_date)
-        f_name = 'sampled_{dtype}_{mode}_{len_sample}_{size}_{seed}{min_date}{max_date}_created_{timestamp}{flags}.csv'.format(dtype=dtype, mode=mode, len_sample=len(sample),
+        f_name = 'sampled_{mode}_{len_sample}_{size}_{seed}{min_date}{max_date}_created_{timestamp}{flags}.csv'.format(mode=mode, len_sample=len(sample),
                 size=size, seed=self.seed, timestamp=timestamp, min_date=min_date_str, max_date=max_date_str, flags=flags)
         full_path = os.path.join(find_folder('2_sampled'), f_name)
-        self.logger.info('Writing file {} ...'.format(full_path))
+        logger.info('Writing file {} ...'.format(full_path))
         if 'all' in columns:
             sample.to_csv(full_path, encoding='utf8')
         else:
@@ -126,9 +128,9 @@ class SampleGenerator(object):
         still_available = tweet_ids_sampled - tweet_ids_unavailable - tweet_ids_labelled
         if not ignore_previous:
             still_available -= tweet_ids_batched
-        self.logger.info('Unique tweets in base sample(s): {:,} (labelled: {:,}, unavailable: {:,}, in previous batches: {:,})'.format(len(tweet_ids_sampled), len(tweet_ids_labelled), len(tweet_ids_unavailable), len(tweet_ids_batched)))
-        self.logger.info('Tweets left to sample from: {:,}'.format(len(still_available)))
-        self.logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
+        logger.info('Unique tweets in base sample(s): {:,} (labelled: {:,}, unavailable: {:,}, in previous batches: {:,})'.format(len(tweet_ids_sampled), len(tweet_ids_labelled), len(tweet_ids_unavailable), len(tweet_ids_batched)))
+        logger.info('Tweets left to sample from: {:,}'.format(len(still_available)))
+        logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
 
 
     def generate_batch(self, num_tweets=None, batch_id=None, tail=True, ignore_previous=False):
@@ -167,15 +169,15 @@ class SampleGenerator(object):
         still_available = tweet_ids_sampled - tweet_ids_unavailable - tweet_ids_labelled
         if not ignore_previous:
             still_available -= tweet_ids_batched
-        self.logger.info('Unique tweets in base sample(s): {:,} (labelled: {:,}, unavailable: {:,}, in previous batches: {:,})'.format(len(tweet_ids_sampled), len(tweet_ids_labelled), len(tweet_ids_unavailable), len(tweet_ids_batched)))
-        self.logger.info('Tweets left to sample from: {:,}'.format(len(still_available)))
-        self.logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
+        logger.info('Unique tweets in base sample(s): {:,} (labelled: {:,}, unavailable: {:,}, in previous batches: {:,})'.format(len(tweet_ids_sampled), len(tweet_ids_labelled), len(tweet_ids_unavailable), len(tweet_ids_batched)))
+        logger.info('Tweets left to sample from: {:,}'.format(len(still_available)))
+        logger.info('Precentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
         # return conditions
         if len(still_available) <= 0:
-            self.logger.warn('All available tweets have been labelled.'.format(len(tweet_ids_sampled), len(still_available)))
+            logger.warn('All available tweets have been labelled.'.format(len(tweet_ids_sampled), len(still_available)))
             return
         if num_tweets > len(still_available):
-            self.logger.warn('Requested to create batch of {:,}, but only {:,} are still available.'.format(num_tweets, len(still_available)))
+            logger.warn('Requested to create batch of {:,}, but only {:,} are still available.'.format(num_tweets, len(still_available)))
             return
         if tail:
             batch = df_samples.loc[df_samples['tweet_id'].isin(still_available)][-num_tweets:]
@@ -189,7 +191,7 @@ class SampleGenerator(object):
             except ValueError:
                 batch_id = 1
         batch_name = 'batch_{}'.format(batch_id)
-        self.logger.info('Generating batch {} of size {:,} tweets...'.format(batch_name, num_tweets))
+        logger.info('Generating batch {} of size {:,} tweets...'.format(batch_name, num_tweets))
         output_folder = os.path.join(sample_folder, batch_name)
         if not os.path.isdir(output_folder):
             os.mkdir(output_folder)
@@ -197,7 +199,7 @@ class SampleGenerator(object):
             raise Exception('Found pre-existing folder "{}". Please remove this folder first or pick a different batch ID.'.format(output_folder))
         f_path = os.path.join(output_folder, '{}_{}.csv'.format(batch_name, datetime.now().strftime('%Y-%m-%d')))
         batch.to_csv(f_path, header=None, index=False, encoding='utf8')
-        self.logger.info('Successfully wrote file containing new batch "{}"'.format(f_path))
+        logger.info('Successfully wrote file containing new batch "{}"'.format(f_path))
 
     # methods for distribution analysis
 
@@ -227,33 +229,36 @@ class SampleGenerator(object):
         return self.indices,self.days,self.months,self.years
 
 
-def run(dtype='anonymized', size=None, langs=None, include_replies=False, contains_keywords=False, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
-    logger = logging.getLogger(__name__)
+def run(size=None, langs=None, include_replies=False, anonymize=True, contains_keywords=False, min_token_count=3, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None):
     if bin_size is None:
         logger.info('Creating sample of size {:,}...'.format(size))
     else:
         logger.info('Creating sample of size {:,} or bin size {:,}...'.format(size, bin_size))
-    logger.info('Reading data of type "{}"...'.format(dtype))
-    df = get_parsed_data(dtype=dtype, usecols=['id', 'text', 'is_duplicate', 'created_at', 'use_for_labelling', 'contains_keywords', 'lang', 'in_reply_to_status_id'])
+    df = get_parsed_data(usecols=['id', 'text', 'created_at', 'lang', 'is_reply', 'has_quote', 'token_count'],
+            contains_keywords=contains_keywords,
+            num_files=200,
+            s_date=min_date,
+            e_date=max_date)
     logger.info(f'Read {len(df):,} samples. Filtering...')
     flags = ''
     # Filter by date
     if min_date is not None or max_date is not None:
         logger.info('Filtering by dates...')
         df = df[min_date:max_date]
-    # Select use for labelling (not retweet, no extracted tweet) and no duplicate
-    logger.info('Filtering for default flags (use_for_labelling/is_duplicate)...')
-    df = df[(df.use_for_labelling) & (~df.is_duplicate)]
+    # Min token count
+    if isinstance(min_token_count, int):
+        logger.info('Filtering by min_token_count...')
+        df = df[df.token_count > min_token_count]
     if not include_replies:
         # by default filter replies
-        df = df[df.in_reply_to_status_id.isna()]
+        df = df[~df.is_reply]
     else:
         logger.info('Including replies...')
         flags += '_include_replies'
     # Contains keywords
     if contains_keywords:
-        logger.info('Filtering for contains_keywords...')
-        df = df[df.contains_keywords]
+        # data was already filtered in get_parsed_data
+        logger.info('Filtered for contains_keywords...')
         flags += '_contains_keywords'
     # Filter by language
     if isinstance(langs, list):
@@ -268,7 +273,7 @@ def run(dtype='anonymized', size=None, langs=None, include_replies=False, contai
         df_sampled = get_sampled_data()
         df = df[~df.id.isin(df_sampled.tweet_id)]
         df = df[~df.text.isin(df_sampled.tweet_text)]
-    # is_duplicate only marks duplicates before replacing <url> and <@user> tokens
+    # is_duplicate only marks duplicates before replacing <url> and @user tokens
     logger.info('Final screening for duplicates...')
     df['text_cleared'] = df.text.str.replace(r'@<user>|<url>', '')
     df['text_cleared'] = df.text_cleared.str.strip()
@@ -300,4 +305,8 @@ def run(dtype='anonymized', size=None, langs=None, include_replies=False, contai
     elif mode == 'random':
         logger.info('Generating random sample...')
         sample = generator.random_sample(df, size)
-    generator.write_sample(sample, dtype, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date, flags=flags)
+    # anonymize
+    if anonymize:
+        logger.info('Anonymizing sample...')
+        sample.loc[:, 'text'] = sample.text.apply(ProcessTweet.anonymize_text)
+    generator.write_sample(sample, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date, flags=flags)

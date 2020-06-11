@@ -15,6 +15,10 @@ from functools import lru_cache
 logger = logging.getLogger(__name__)
 nlp = spacy.load('en_core_web_sm')
 
+# compile regexes
+username_regex = re.compile(r'(^|[^@\w])@(\w{1,15})\b')
+url_regex = re.compile(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))')
+
 class ProcessTweet():
     """Wrapper class for functions to process/modify tweets"""
 
@@ -116,6 +120,30 @@ class ProcessTweet():
         else:
             text = tweet_obj['text']
         return self.normalize_str(text)
+
+    @staticmethod
+    def replace_usernames(text, filler='@user'):
+        # replace other user handles by filler
+        text = re.sub(username_regex, filler, text)
+        # add spaces between, and remove double spaces again
+        text = text.replace(filler, f' {filler} ')
+        text = ' '.join(text.split())
+        return text
+
+    @staticmethod
+    def anonymize_text(text, url_filler='<url>', user_filler='@user'):
+        text = ProcessTweet.replace_urls(text, filler=url_filler)
+        text = ProcessTweet.replace_usernames(text, filler=user_filler)
+        return text
+
+    @staticmethod
+    def replace_urls(text, filler='<url>'):
+        # replace other urls by filler
+        text = re.sub(url_regex, filler, text)
+        # add spaces between, and remove double spaces again
+        text = text.replace(filler, f' {filler} ')
+        text = ' '.join(text.split())
+        return text
 
     def convert_to_iso_time(self, date):
         ts = pd.to_datetime(date)
@@ -288,8 +316,10 @@ class ProcessTweet():
         return media_info
 
     def replace_user_mentions(self, tweet_text, status_type='default'):
-        """Replaces @user mentions in tweet text based on indices provided in entities.user_mentions.indices"""
-        filler = '@<user>'
+        """Replaces @user mentions in tweet text based on indices provided in entities.user_mentions.indices.
+        This method is arguably more complext than a simple regex but it relies on actually tagged users.
+        """
+        filler = '@user'
         corr = 0
         if status_type == 'default':
             try:
@@ -311,21 +341,6 @@ class ProcessTweet():
             tweet_text = tweet_text[:s] + filler + tweet_text[e:]
             corr += (e-s) - len(filler)
         return tweet_text
-
-    def replace_urls(self, tweet_text):
-        return re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','<url>', tweet_text)
-
-    def anonymize_text(self, tweet_text, status_type='default'):
-        tweet_text = self.replace_user_mentions(tweet_text, status_type)
-        tweet_text = self.replace_urls(tweet_text)
-        return tweet_text
-
-    def anonymize(self, tweet_obj):
-        tweet_obj_anonymized = copy(tweet_obj)
-        tweet_obj_anonymized['text'] = self.anonymize_text(tweet_obj_anonymized['text'])
-        if tweet_obj_anonymized['has_quoted_status']:
-            tweet_obj_anonymized['quoted_status.text'] = self.anonymize_text(tweet_obj_anonymized['quoted_status.text'], status_type='quoted')
-        return tweet_obj_anonymized
 
     def contains_keywords(self, search_text=True, search_urls=True):
         """Here we pool all relevant text within the tweet to do the matching. From the twitter docs:

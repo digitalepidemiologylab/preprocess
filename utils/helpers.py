@@ -9,38 +9,77 @@ import warnings
 import csv
 import logging
 import re
+import multiprocessing
+import joblib
+from tqdm import tqdm
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
-def get_parsed_data(dtype='anonymized', frac=1.0, contains_keywords=False, flag=None, usecols=None, nrows=None):
+def get_parsed_data(contains_keywords=False, usecols=None, nrows=None, s_date=None, e_date=None, read_in_parallel=True, num_files=None):
     """Read parsed data
-    :param dtype: possible values: "original", "anonymized", "encrypted"
-    :param frac: fraction of data to be read (default 1)
     :param contains_keywords: Only get data where contains_keywords is True (default: False)
-    :param flag: Can be None, 'use_for_prediction', 'use_for_labelling'. None gives all data, use_for_prediction/labelling gives corresponding
-    labelled subset. The first time used, the subset will be cached for subsequent use.
     :param usecols: Only extract certain columns (default: all columns)
+    :param nrows: Read n rows
+    :param s_date: start date to read from (str of format YYYY-MM-dd or datetime obj)
+    :param e_date: end date to read from (str of format YYYY-MM-dd or datetime obj)
     """
-    f_name = get_f_name(dtype, processing_step='parsed', flag=flag, contains_keywords=contains_keywords)
-    if flag is not None or contains_keywords:
-        f_path = find_file(f_name, subfolder='1_parsed', cached=True)
-        if f_path == '':
-            # No cached file found, read full file
-            f_name_full = get_f_name(dtype, processing_step='parsed')
-            f_path_full = find_file(f_name_full, subfolder='1_parsed')
-            df = read_raw_data_from_csv(f_path_full, dtype, frac=frac, usecols=usecols, nrows=nrows)
-            if flag is not None:
-                df = df[df[flag]]
-            if contains_keywords:
-                df = df[df['contains_keywords']]
-            # write cached file
-            path = os.path.join(os.path.dirname(f_path_full), f_name)
-            df.to_csv(path, encoding='utf8')
-            return df
+    def parse_date_from_f_name(f_name):
+        f_name = os.path.basename(f_name)
+        date = f_name.split('.')[0][len('parsed_'):]
+        if len(date.split('-')) == 3:
+            # YYYY-MM-dd format
+            return datetime.strptime(date, '%Y-%m-%d')
+        else:
+            # assume YYYY-MM-dd-HH format
+            return datetime.strptime(date, '%Y-%m-%d-%H')
+    def get_f_names(s_date=s_date, e_date=e_date):
+        data_folder = get_data_folder()
+        f_path = os.path.join(data_folder, '1_parsed', 'tweets', '*.parquet')
+        f_names = glob.glob(f_path)
+        if s_date is not None or e_date is not None:
+            f_names_dates = {f_name: parse_date_from_f_name(f_name) for f_name in f_names}
+            if s_date is not None:
+                if not isinstance(s_date, datetime):
+                    s_date = datetime.strptime(s_date, '%Y-%m-%d')
+                f_names = [f_name for f_name in f_names if f_names_dates[f_name] > s_date]
+            if e_date is not None:
+                if not isinstance(e_date, datetime):
+                    e_date = datetime.strptime(e_date, '%Y-%m-%d')
+                f_names = [f_name for f_name in f_names if f_names_dates[f_name] < e_date]
+        return f_names
+
+    def read_data(f_name):
+        """Reads single parquet file"""
+        df = pd.read_parquet(f_name, columns=usecols)
+        if contains_keywords:
+            df = df[df.contains_keywords].drop(columns=['contains_keywords'])
+        return df
+    # sanity check on params
+    if contains_keywords and usecols is not None and 'contains_keywords' not in usecols:
+        usecols += ['contains_keywords']
+    # load files
+    f_names = get_f_names()
+    if isinstance(num_files, int):
+        f_names = f_names[:num_files]
+    # set up parallel
+    if read_in_parallel:
+        n_jobs = max(multiprocessing.cpu_count() - 1, 1)
     else:
-        f_path = find_file(f_name, subfolder='1_parsed')
-    return read_raw_data_from_csv(f_path, dtype, frac=frac, usecols=usecols, nrows=nrows)
+        n_jobs = 1
+    parallel = joblib.Parallel(n_jobs=n_jobs, prefer='threads')
+    read_data_delayed = joblib.delayed(read_data)
+    # load data
+    logger.info('Reading data...')
+    df = parallel(read_data_delayed(f_name) for f_name in tqdm(f_names))
+    logger.info('Concatenating data...')
+    df = pd.concat(df)
+    # convert to category
+    for col in ['country_code', 'region', 'subregion', 'geo_type', 'lang']:
+        if col in df:
+            df[col] = df[col].astype('category')
+    return df
 
 def get_labelled_data(pattern='*', mode='*', usecols=None):
     """Read labelled data
@@ -232,7 +271,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
         df.rename(columns=column_rename, inplace=True)
         df_pred = pd.concat([df_pred, df], axis=1)
     if include_raw_data:
-        df = get_parsed_data(dtype=dtype, usecols=usecols, nrows=nrows)
+        df = get_parsed_data(usecols=usecols, nrows=nrows)
         assert len(df) == len(df_pred), 'Length of prediction and raw data are not equal'
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1, sort=True)
@@ -263,7 +302,7 @@ def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=No
         if extra_cols is not None:
             for ec in extra_cols:
                 usecols.append(ec)
-    df = get_parsed_data(dtype=dtype, usecols=usecols, nrows=nrows)
+    df = get_parsed_data(usecols=usecols, nrows=nrows)
     if include_predictions:
         df_pred = get_predicted_data(include_raw_data=False, dtype=dtype, nrows=nrows)
         df_pred.index = df.index

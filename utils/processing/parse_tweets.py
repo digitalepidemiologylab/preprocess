@@ -57,7 +57,7 @@ def generate_file_list():
         f_names.extend([str(g) for g in globbed])
     grouped_f_names = defaultdict(list)
     for f_name in f_names:
-        if len(f_name.split('/')) < 3:
+        if os.path.basename(f_name).startswith('tweets'):
             date_str = f_name.split('-')[1]
             day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime('%Y-%m-%d')
         else:
