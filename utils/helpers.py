@@ -17,11 +17,10 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-def get_parsed_data(contains_keywords=False, usecols=None, nrows=None, s_date=None, e_date=None, read_in_parallel=True, num_files=None):
+def get_parsed_data(contains_keywords=False, usecols=None, s_date=None, e_date=None, read_in_parallel=True, num_files=None):
     """Read parsed data
     :param contains_keywords: Only get data where contains_keywords is True (default: False)
     :param usecols: Only extract certain columns (default: all columns)
-    :param nrows: Read n rows
     :param s_date: start date to read from (str of format YYYY-MM-dd or datetime obj)
     :param e_date: end date to read from (str of format YYYY-MM-dd or datetime obj)
     """
