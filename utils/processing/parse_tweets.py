@@ -21,6 +21,7 @@ import shutil
 import pickle
 import gzip
 import bz2
+import ray
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ retweet_counts = manager.dict()
 quote_counts = manager.dict()
 replies_counts = manager.dict()
 
+ray.init()
 
 def read_used_files():
     f_path = os.path.join(output_folder, f'.used_data')
@@ -65,10 +67,12 @@ def generate_file_list():
         grouped_f_names[day_str].append(f_name)
     return grouped_f_names
 
+@ray.remote
 def write_parquet_file(f_path_intermediary, interaction_counts):
+    key = f_path_intermediary.split('/')[-1].split('.jsonl')[0]
+    f_out = os.path.join(output_folder, 'tweets', f'parsed_{key}.parquet')
     # read from json lines
     dtypes = get_dtypes()
-    key = f_path_intermediary.split('/')[-1].split('.jsonl')[0]
     df = pd.read_json(f_path_intermediary, lines=True, dtype=dtypes)
     if len(df) > 0:
         # drop duplicates
@@ -76,10 +80,19 @@ def write_parquet_file(f_path_intermediary, interaction_counts):
         # read_json converts null to stringified 'None', convert manually
         for col in [c for c, v in dtypes.items() if v == str]:
             df.loc[df[col] == 'None', col] = None
+        # sanity check, verify uniqueness of IDs
+        df = df.drop_duplicates(subset=['id'])
         # merge with interaction counts
-        df = df.merge(interaction_counts, on='id', how='left')
-        for col in ['num_replies', 'num_quotes', 'num_retweets']:
-            df[col] = df[col].fillna(0).astype(int)
+        if len(interaction_counts) > 0:
+            # subsetting interaction counts to save memory during merge
+            interaction_counts = interaction_counts[interaction_counts.id.isin(df.id.unique())]
+            df = df.merge(interaction_counts, on='id', how='left')
+            for col in ['num_replies', 'num_quotes', 'num_retweets']:
+                df[col] = df[col].fillna(0).astype(int)
+        else:
+            # set default values
+            for col in ['num_replies', 'num_quotes', 'num_retweets']:
+                df[col] = 0
         # convert columns to datetime
         for datetime_col in ['created_at', 'user.created_at']:
             df[datetime_col] = pd.to_datetime(df[datetime_col])
@@ -227,11 +240,15 @@ def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract
     interaction_counts = merge_interaction_counts()
     interaction_counts_fname = dump_interaction_counts(interaction_counts)
 
+    # store counts as shared memory
+    data_id = ray.put(interaction_counts)
+
     # add interaction data to tweets and write compressed parquet dataframes
     logger.info('Writing parquet files...')
-    write_parquet_file_delayed = joblib.delayed(write_parquet_file)
     f_names_intermediary = glob.glob(os.path.join(output_folder, 'preliminary', '*.jsonl'))
-    res = parallel((write_parquet_file_delayed(key, interaction_counts) for key in tqdm(f_names_intermediary)))
+
+    # control batch size for memory requirements
+    res = ray.get([write_parquet_file.remote(f_name, data_id) for f_name in tqdm(f_names_intermediary)])
     num_tweets = sum(res)
     logger.info(f'Collected a total of {num_tweets:,} tweets in {len(f_names_intermediary):,} parquet files')
 
@@ -244,8 +261,5 @@ def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract
     if os.path.isdir(preliminary_folder):
         logger.info('Cleaning up intermediary files...')
         shutil.rmtree(preliminary_folder)
-    if os.path.isfile(interaction_counts_fname):
-        logger.info('Cleaning up counts file...')
-        os.remove(interaction_counts_fname)
     e_time = time.time()
     logger.info(f'Finished in {(e_time-s_time)/3600:.1f} hours')
