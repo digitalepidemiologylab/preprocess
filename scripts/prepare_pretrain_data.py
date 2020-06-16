@@ -57,6 +57,7 @@ def main(args):
     # filter min tokens
     if args.min_tokens > 0:
         logger.info(f'Filter has >={args.min_tokens} tokens...')
+        num_before = len(df)
         df = df[df.token_count >= args.min_tokens]
         num_after = len(df)
         logger.info(f'... {num_after:,} remaining (removed {num_before-num_after:,})')
