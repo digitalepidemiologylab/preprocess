@@ -296,6 +296,15 @@ class ProcessTweet():
         else:
             return user_mentions
 
+    @property
+    def has_media(self):
+        try:
+            self.extended_tweet['extended_entities']['media']
+        except KeyError:
+            return False
+        else:
+            return True
+
     def get_media_info(self, tweet_obj=None):
         if tweet_obj is None:
             tweet_obj = self.tweet
