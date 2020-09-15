@@ -56,11 +56,12 @@ class ArgParse(object):
         parser = ArgParseDefault(description='Preprocess raw data to create parquet files in `data/1_parsed`')
         parser.add_argument('-l', '--lang', default='en_core_web_sm', required=False, help='Spacy language model. This is used for word tokenization count.')
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
+        parser.add_argument('--extend', dest='extend', action='store_true', default=False, help='Extend existing parsed data')
         add_bool_arg(parser, 'extract_retweets', default=True, help='Extract top-level retweets')
         add_bool_arg(parser, 'extract_quotes', default=True, help='Extract top-level quotes')
-        add_bool_arg(parser, 'extend', default=False, help='Extend existing data dump')
+        add_bool_arg(parser, 'omit_last_day', default=True, help='Omit parsing data from the last day')
         args = parser.parse_args(sys.argv[2:])
-        parse_tweets.run(lang=args.lang, no_parallel=args.no_parallel, extract_retweets=args.extract_retweets, extract_quotes=args.extract_quotes)
+        parse_tweets.run(lang=args.lang, no_parallel=args.no_parallel, extract_retweets=args.extract_retweets, extract_quotes=args.extract_quotes, extend=args.extend, omit_last_day=args.omit_last_day)
 
     def sample(self):
         import utils.processing.sample_tweets as sample_tweets
