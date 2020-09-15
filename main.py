@@ -58,6 +58,7 @@ class ArgParse(object):
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
         add_bool_arg(parser, 'extract_retweets', default=True, help='Extract top-level retweets')
         add_bool_arg(parser, 'extract_quotes', default=True, help='Extract top-level quotes')
+        add_bool_arg(parser, 'extend', default=False, help='Extend existing data dump')
         args = parser.parse_args(sys.argv[2:])
         parse_tweets.run(lang=args.lang, no_parallel=args.no_parallel, extract_retweets=args.extract_retweets, extract_quotes=args.extract_quotes)
 
