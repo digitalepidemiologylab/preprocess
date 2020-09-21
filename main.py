@@ -57,11 +57,12 @@ class ArgParse(object):
         parser.add_argument('-l', '--lang', default='en_core_web_sm', required=False, help='Spacy language model. This is used for word tokenization count.')
         parser.add_argument('--no-parallel', dest='no_parallel', action='store_true', default=False, help='Do not run in parallel')
         parser.add_argument('--extend', dest='extend', action='store_true', default=False, help='Extend existing parsed data')
+        parser.add_argument('--ray_num_cpu', type=int, default=None, help='Limit the number of worker processes for Ray during the memory intensive merge phase (by default using maximum worker processes)')
         add_bool_arg(parser, 'extract_retweets', default=True, help='Extract top-level retweets')
         add_bool_arg(parser, 'extract_quotes', default=True, help='Extract top-level quotes')
         add_bool_arg(parser, 'omit_last_day', default=True, help='Omit parsing data from the last day')
         args = parser.parse_args(sys.argv[2:])
-        parse_tweets.run(lang=args.lang, no_parallel=args.no_parallel, extract_retweets=args.extract_retweets, extract_quotes=args.extract_quotes, extend=args.extend, omit_last_day=args.omit_last_day)
+        parse_tweets.run(lang=args.lang, no_parallel=args.no_parallel, extract_retweets=args.extract_retweets, extract_quotes=args.extract_quotes, extend=args.extend, omit_last_day=args.omit_last_day, ray_num_cpu=args.ray_num_cpu)
 
     def sample(self):
         import utils.processing.sample_tweets as sample_tweets

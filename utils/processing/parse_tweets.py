@@ -37,7 +37,6 @@ retweet_counts = manager.dict()
 quote_counts = manager.dict()
 replies_counts = manager.dict()
 
-ray.init()
 
 def read_used_files():
     f_path = os.path.join(output_folder, f'.used_data')
@@ -164,7 +163,7 @@ def dump_interaction_counts(interaction_counts):
         pickle.dump(dict(interaction_counts), f)
     return f_name
 
-def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True):
+def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpu=None):
     def extract_tweets(day, f_names, keywords):
         gc = Geocode()
         gc.init()
@@ -291,6 +290,9 @@ def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract
     interaction_counts_fname = dump_interaction_counts(interaction_counts)
 
     # store counts as shared memory
+    if ray_num_cpus is None and no_parallel:
+        ray_num_cpus = 1
+    ray.init(num_cpus=ray_num_cpus)
     data_id = ray.put(interaction_counts)
 
     if extend:
