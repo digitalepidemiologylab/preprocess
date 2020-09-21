@@ -87,7 +87,7 @@ class ProcessTweet():
 
     @property
     def is_verified(self):
-        return self.tweet['user']['verified'] is True
+        return self.tweet['user']['verified']
 
     @property
     def has_coordinates(self):
@@ -96,6 +96,13 @@ class ProcessTweet():
     @property
     def has_place(self):
         return self.tweet['place'] is not None
+
+    @property
+    def lang(self):
+        try:
+            return self.tweet['lang']
+        except KeyError:
+            return None
 
     @property
     def has_place_bounding_box(self):
@@ -173,7 +180,7 @@ class ProcessTweet():
                 'user.created_at': self.convert_to_iso_time(self.tweet['user']['created_at']),
                 'user.statuses_count': self.tweet['user']['statuses_count'],
                 'user.is_verified': self.is_verified,
-                'lang': self.tweet['lang'],
+                'lang': self.lang,
                 'token_count': self.get_token_count(),
                 'is_retweet': self.is_retweet,
                 'has_quote': self.has_quote,
