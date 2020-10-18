@@ -6,11 +6,11 @@ import hashlib
 import shapely.geometry
 import pickle
 import itertools
-from html.parser import HTMLParser
 import unicodedata
 import re
 import logging
 from functools import lru_cache
+import html
 
 logger = logging.getLogger(__name__)
 nlp = spacy.load('en_core_web_sm')
@@ -18,6 +18,7 @@ nlp = spacy.load('en_core_web_sm')
 # compile regexes
 username_regex = re.compile(r'(^|[^@\w])@(\w{1,15})\b')
 url_regex = re.compile(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))')
+control_char_regex = re.compile(r'[\r\n\t]+')
 
 class ProcessTweet():
     """Wrapper class for functions to process/modify tweets"""
@@ -25,8 +26,6 @@ class ProcessTweet():
     def __init__(self, tweet=None, keywords=None, map_data=None, gc=None):
         self.tweet = tweet
         self.extended_tweet = self._get_extended_tweet()
-        self.html_parser = HTMLParser()
-        self.control_char_regex = r'[\r\n\t]+'
         if keywords is None:
             self.keywords = []
         else:
@@ -119,7 +118,7 @@ class ProcessTweet():
             text = tweet_obj['extended_tweet']['full_text']
         else:
             text = tweet_obj['text']
-        return self.normalize_str(text)
+        return ProcessTweet.normalize_str(text)
 
     @staticmethod
     def replace_usernames(text, filler='@user'):
@@ -135,6 +134,22 @@ class ProcessTweet():
         text = ProcessTweet.replace_urls(text, filler=url_filler)
         text = ProcessTweet.replace_usernames(text, filler=user_filler)
         return text
+
+    @staticmethod
+    def normalize_str(s):
+        if not s:
+            return ''
+        if not isinstance(s, str):
+            s = str(s)
+        # covnert HTML
+        s = html.unescape(s)
+        # replace \t, \n and \r characters by a whitespace
+        s = re.sub(control_char_regex, ' ', s)
+        # removes all other control characters and the NULL byte (which causes issues when parsing with pandas)
+        s =  "".join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
+        # remove duplicate whitespace
+        s = ' '.join(s.split())
+        return s
 
     @staticmethod
     def replace_urls(text, filler='<url>'):
@@ -165,7 +180,7 @@ class ProcessTweet():
                 'user.id': self.user_id,
                 'user.screen_name': self.tweet['user']['screen_name'],
                 'user.name': self.tweet['user']['name'],
-                'user.description': self.normalize_str(self.tweet['user']['description']),
+                'user.description': ProcessTweet.normalize_str(self.tweet['user']['description']),
                 'user.timezone': self.user_timezone,
                 'user.location': self.tweet['user']['location'],
                 'user.num_followers': self.tweet['user']['followers_count'],
@@ -181,19 +196,6 @@ class ProcessTweet():
                 'contains_keywords': self.contains_keywords(),
                 **geo_obj
                 }
-
-    def normalize_str(self, s):
-        if not s:
-            return ''
-        if not isinstance(s, str):
-            s = str(s)
-        # replace \t, \n and \r characters by a whitespace
-        s = re.sub(self.control_char_regex, ' ', s)
-        # replace HTML codes for new line characters
-        s = s.replace('&#13;', '').replace('&#10;', '')
-        s = self.html_parser.unescape(s)
-        # removes all other control characters and the NULL byte (which causes issues when parsing with pandas)
-        return "".join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
 
     def get_geo_info(self):
         """
