@@ -82,6 +82,17 @@ class ArgParse(object):
         args = parser.parse_args(sys.argv[2:])
         sample_tweets.run(size=args.size, contains_keywords=args.contains_keywords, anonymize=args.anonymize, min_token_count=args.min_token_count, langs=args.langs, include_replies=args.include_replies, mode=args.mode, seed=args.seed, extend=args.extend, bin_size=args.bin_size, min_date=args.min_date, max_date=args.max_date)
 
+    def sample(self):
+        import utils.processing.sample_tweets_v2 as sample_tweets
+        parser = ArgParseDefault(description='Sample cleaned data to generate `data/2_sampled`')
+        # size parameter: Size of sample
+        # contains keywords (nargs='+')
+        # langs
+        # seed
+        # min_date, max_date
+        args = parser.parse_args(sys.argv[2:])
+        sample_tweets.run(args)
+
     def batch(self):
         from utils.processing.sample_tweets import SampleGenerator
         parser = ArgParseDefault(description='Generate new batch for labelling. As a result a new csv will be created in `data/2_sampled/batch_{batch_id}/`')
