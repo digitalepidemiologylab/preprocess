@@ -8,6 +8,10 @@ import joblib
 import multiprocessing
 import unicodedata
 import emoji
+import sys
+sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
+# sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
+
 from html.parser import HTMLParser
 # Import module for regular expressions
 import re
@@ -132,12 +136,10 @@ def run(dtype='anonymized', size=None, bin_size=None, langs='en', include_replie
 
     logger.info(f'Read a total of {len(df):,} tweets. Filtering...')
     flags = ''
-
     df.reset_index(drop=True, inplace=True)
     min_num_tokens = 5
     min_num_chars = 10
     exec_time = datetime.now().timestamp()
-
     # Take a sample
     num_raw_samples = len(df)
     df = df.sample(frac=.2, random_state=0)
