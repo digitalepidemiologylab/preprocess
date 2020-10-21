@@ -7,8 +7,8 @@ import pdb
 import pandas as pd
 import numpy as np
 import sys
-sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June
-# sys.path.append('/drives/sdf/martin/preprocess') # data until September
+sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
+# sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
 
 
 # In[2]:
@@ -69,7 +69,6 @@ df
 
 # Take a sample
 sample_df = df.sample(frac=0.001, random_state=0)
-pdb.set_trace()
 
 # Remove retweets
 sample_df = sample_df.loc[sample_df['is_retweet']!=True]
@@ -157,11 +156,12 @@ for i in range(len_sample-1):
 		# Identify near-duplicates within sample_df		
 		if lev.distance(sample_df.text.iloc[i], sample_df.text.iloc[j])<10:
 		# Add new near-duplicates to the array dup_idx	
-			if sample_df.index[j] not in dup_idx:
-				dup_idx.append(sample_df.index[j])
+			if j not in dup_idx:
+				dup_idx.append(j)
 # Remove near-duplicates
-sample_df.drop(labels=dup_idx, inplace=True)
+sample_df = sample_df.drop(labels=sample_df.iloc[dup_idx].index)
 
+pdb.set_trace()
 # In[10]:
 
 
@@ -177,4 +177,4 @@ print('Number of remaining tweets before keyword matching: ' , len_sample)
 keyword_bool = sample_df.text.str.contains(r'wear|masks?|protect|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
 clean_sample = sample_df[keyword_bool]
 print('Number of relevant tweets: ',len(clean_sample))
-pdb.set_trace()
+
