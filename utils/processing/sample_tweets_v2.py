@@ -1,20 +1,22 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
 import pdb
 import pandas as pd
 import numpy as np
+from utils.helpers import get_parsed_data
+import unicodedata
+import emoji
+from html.parser import HTMLParser
+# Import module for regular expressions
+import re
+# Import Python extension for computing string edit distances and similarities
+import Levenshtein as lev
+
 import sys
 sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
 # sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
 
-
-# In[2]:
-
-
-from utils.helpers import get_parsed_data
 
 # Available columns:
 # id                                     object
@@ -54,18 +56,10 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-
-# In[3]:
-
-
 # Load data
 df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet'])
 df.reset_index(drop=True, inplace=True)
 df
-
-
-# In[4]:
-
 
 # Take a sample
 sample_df = df.sample(frac=0.001, random_state=0)
@@ -79,17 +73,7 @@ sample_df = sample_df.loc[sample_df['lang']=='en'].copy()
 len_sample = len(sample_df)
 print('Total number of English tweets: ', len_sample)
 
-
 # **Cleaning the data**
-
-# In[5]:
-
-
-from html.parser import HTMLParser
-# Import module for regular expressions
-import re
-import unicodedata
-
 # Create an instance of a HTML parser
 html_parser = HTMLParser()
 # Escape HTML symbols
@@ -110,7 +94,6 @@ sample_df.text = sample_df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(
 # Replace \t, \n and \r characters with a whitespace
 sample_df.text = sample_df.text.str.replace(r'[\r\n\t]+', ' ')
 
-import emoji
 
 def misc_rem(text):
     # Remove all emojis
@@ -132,8 +115,6 @@ sample_df.text = sample_df.text.apply(misc_rem)
 
 # **Select the potentially relevant tweets**
 
-# In[7]:
-
 # Remove gibberish
 sample_df = sample_df.loc[sample_df.text.str.len()>5].copy()
 
@@ -142,12 +123,6 @@ len_sample = len(sample_df)
 print('Total number of potentially relevant English tweets: ', len_sample)
 
 # **Removing near-duplicates and selecting tweets based on keyword matching**
-
-# In[9]:
-
-
-# Import Python extension for computing string edit distances and similarities
-import Levenshtein as lev
 
 #Empty array to be filled with indices corresponding to near-duplicates
 dup_idx = []
@@ -161,17 +136,9 @@ for i in range(len_sample-1):
 # Remove near-duplicates
 sample_df = sample_df.drop(labels=sample_df.iloc[dup_idx].index)
 
-pdb.set_trace()
-# In[10]:
-
-
 # Compute the number of remaining tweets
 len_sample = len(sample_df)
 print('Number of remaining tweets before keyword matching: ' , len_sample)
-
-
-# In[12]:
-
 
 # Select tweets based on keyword matching
 keyword_bool = sample_df.text.str.contains(r'wear|masks?|protect|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
