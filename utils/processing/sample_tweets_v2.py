@@ -116,7 +116,6 @@ class SampleGenerator(object):
         return self.indices, self.days, self.months, self.years 
 
 
-<<<<<<< fb3bdcc1dad473950b70a67edcb4f14960129b2d
 # def run(args):
 def run(dtype='anonymized', size=None, bin_size=None, langs='en', include_replies=False, mode='monthly', seed=None, extend=False, min_date=None, max_date=None):
     logger = logging.getLogger(__name__)
