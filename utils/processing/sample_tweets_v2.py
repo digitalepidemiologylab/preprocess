@@ -59,7 +59,7 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-def cleaning():
+def cleaning_f():
     # Load data
     df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet'])
     df.reset_index(drop=True, inplace=True)
@@ -129,8 +129,7 @@ def cleaning():
         for i in range(len(dfr)):
             for j in range(i+1):
                 yield (dfr.text.iloc[i],dfr.text.iloc[j])
-    
-    
+        
     def lev_distance(text1,text2):
         bool_list=[]
         # Identify near-duplicates within sample_df		
@@ -170,4 +169,4 @@ def cleaning():
     return
 
 if __name__ == '__main__':
-    cleaning()
+    cleaning_f()
