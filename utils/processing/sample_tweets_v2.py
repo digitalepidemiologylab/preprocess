@@ -8,6 +8,7 @@ import joblib
 import multiprocessing
 import unicodedata
 import emoji
+
 from html.parser import HTMLParser
 # Import module for regular expressions
 import re
