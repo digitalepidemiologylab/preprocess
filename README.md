@@ -1,13 +1,13 @@
 # Crowdbreaks preprocess
 
-This repository serves as a tool to build preprocessing pipelines for data (such as tweets, images or annotation data) collected through Crowdbreaks.
+This repository can be integrated as a submodule to a Crowdbreaks project. It provides common pipeline tooling for data (such as tweets, images or annotation data) collected through Crowdbreaks.
 
 # Install
 This repository is usually added as a submodule to a project repository. But it can also be run as a standalone.
 
-Install all dependencies using
+Install dependencies using
 ```
-conda env create -n environment.yml
+pip install -r requirements.txt
 ```
 
 # Usage
@@ -22,13 +22,13 @@ python main.py <command> [<args>]
 
 Available commands:
   init             Initialize project
+  sync             Sync project data from S3
   parse            Preprocessing of data to generate `/data/1_parsed`
   sample           Sample cleaned data to generate `data/2_sampled`
   batch            Creates a new batch of tweets from a sampled file in `/data/2_sampled`
   clean_labels     Clean labels generated from Mturk (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
   split            Splits data into training and test data
-  sync             Sync project data from S3
 
 positional arguments:
   command     Subcommand to run
