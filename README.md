@@ -5,8 +5,21 @@ This repository can be integrated as a submodule to a Crowdbreaks project. It pr
 # Install
 This repository is usually added as a submodule to a project repository. But it can also be run as a standalone.
 
+**Cloning the repository as standalone**
+```bash
+git clone git@github.com:crowdbreaks/preprocess.git --recursive
+```
+
+**Cloning as part of a project**
+```bash
+# cd into your project folder
+git submodule add git@github.com:crowdbreaks/preprocess.git
+git submodule update --init
+```
+
 Install dependencies using
 ```
+cd preprocess
 pip install -r requirements.txt
 ```
 
