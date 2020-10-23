@@ -65,7 +65,7 @@ def cleaning_f():
     df.reset_index(drop=True, inplace=True)
 
     # Take a sample
-    sample_df = df.sample(frac=0.001, random_state=0)
+    sample_df = df.sample(frac=0.003, random_state=0)
     # Remove retweets
     sample_df = sample_df.loc[sample_df['is_retweet']!=True]
     
@@ -160,10 +160,10 @@ def cleaning_f():
     print('Number of remaining tweets before keyword matching: ' , len_sample)
     
     # Select tweets based on keyword matching
-    keyword_bool = sample_df.text.str.contains(r'wear|masks?|protect|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
+    keyword_bool = sample_df.text.str.contains(r'wear|masks?|face shield|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
     print('Number of relevant tweets: ',len(clean_sample))
-    
+    pdb.set_trace()
     # Write sample file
     clean_sample.to_csv('../../data/2_sampled/sample_fp211020.csv')
     return
