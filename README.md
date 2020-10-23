@@ -77,6 +77,7 @@ python main.py parse
 
 From the parsed data generate a sample file (used for selecting annotation data). Generates sample data in `data/2_sampled`.
 
+Example:
 ```
 python main.py sample -s 10000
 ```
@@ -88,11 +89,12 @@ From sample files generate batches (in `data/2_sampled/batch_{batch_id}/`).
 ```
 python main.py batch
 ```
+These individual batches can then be annotated with Crowdbreaks.
 
 ## Clean labels
+First, make sure to use the `sync` command to pull the latest annotation data from Crowdbreaks. Clean and merge annotation data based on a consensus and multiple filter options (saved to `data/4_labels_cleaned`).
 
-Clean and merge annotation data based on a consensus and multiple filter options (saved to `data/4_labels_cleaned`).
-
+Example:
 ```
 python main.py clean_labels -s unanimous
 ```
