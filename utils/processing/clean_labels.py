@@ -2,7 +2,6 @@ import pandas as pd
 import os
 from copy import copy
 from collections import defaultdict, Counter
-import matplotlib.pyplot as plt
 import numpy as np
 import sys
 from utils.helpers import find_folder, get_labelled_data, get_parsed_data
@@ -355,6 +354,7 @@ class CleanLabels(object):
 
     def plt_outliers(self):
         import seaborn as sb
+        import matplotlib.pyplot as plt
         fig, ax = plt.subplots(2, 1)
         dotsize = 2
         _ = sb.swarmplot(x='time_values', y=[""]*len(self.outliers), data=self.outliers, hue=self.outliers['time_outlier'], ax=ax[0], size=dotsize)
