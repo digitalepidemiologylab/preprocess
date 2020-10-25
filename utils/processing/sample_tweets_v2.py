@@ -61,11 +61,12 @@ from utils.helpers import get_parsed_data
 
 def cleaning_f():
     # Load data
-    df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet'])
+    df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet', 'user.description'])
     df.reset_index(drop=True, inplace=True)
 
     # Take a sample
     sample_df = df.sample(frac=0.02, random_state=0)
+    
     # Remove retweets
     sample_df = sample_df.loc[sample_df['is_retweet']!=True]
     
@@ -80,20 +81,27 @@ def cleaning_f():
     html_parser = HTMLParser()
     # Escape HTML symbols
     sample_df.text = sample_df.text.apply(html_parser.unescape)
-    
+    sample_df['user.description'] = sample_df['user.description'].apply(html_parser.unescape)
+
     # Replace suspension points with the standard dots
     sample_df.text = sample_df.text.str.replace('…','...')
+    sample_df['user.description'] = sample_df['user.description'].str.replace('…','...')
+
     # Normalize Unicode characters
     sample_df.text = sample_df.text.map(lambda x: unicodedata.normalize('NFKC', x))
-    
+    sample_df['user.description'] = sample_df['user.description'].map(lambda x: unicodedata.normalize('NFKC', x))
+
     # Erase usernames
     sample_df.text = sample_df.text.str.replace(r'(^|[^@\w])@(\w{1,15})\b', '')
+    sample_df['user.description'] = sample_df['user.description'].replace(r'(^|[^@\w])@(\w{1,15})\b', '')
+
     # Erase URLs
     sample_df.text = sample_df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
-    
+    sample_df['user.description'] = sample_df['user.description'].str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
+
     # Replace \t, \n and \r characters with a whitespace
     sample_df.text = sample_df.text.str.replace(r'[\r\n\t]+', ' ')
-    
+    sample_df['user.description'] = sample_df['user.description'].str.replace(r'[\r\n\t]+', ' ') 
     
     def misc_rem(text):
         # Remove all emojis
@@ -111,7 +119,8 @@ def cleaning_f():
         return text
         
     sample_df.text = sample_df.text.apply(misc_rem)
-    
+    sample_df['user.description'] = sample_df['user.description'].apply(misc_rem)
+
     # **Select the potentially relevant tweets**
     
     # Remove gibberish
@@ -143,7 +152,7 @@ def cleaning_f():
     idx_couples = str_combination_gen(sample_df)
     lev_distance_delayed = joblib.delayed(lev_distance)
     parallel = joblib.Parallel(n_jobs = 8)
-    bool_list=parallel(lev_distance_delayed(*arg) for arg in idx_couples)
+    bool_list = parallel(lev_distance_delayed(*arg) for arg in idx_couples)
     bool_arr = np.reshape(np.array(bool_list), len(bool_list))
     l_arr = np.zeros((len_sample, len_sample))
     indices = np.tril_indices(len_sample)
@@ -162,10 +171,9 @@ def cleaning_f():
     # Select tweets based on keyword matching
     keyword_bool = sample_df.text.str.contains(r'wear|mask|respirator|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
-    pdb.set_trace()
     print('Number of relevant tweets: ',len(clean_sample))
     # Write sample file
-    clean_sample.to_csv('../../data/2_sampled/sample_fp211020.csv')
+    clean_sample.to_csv('../../data/2_sampled/sample_fp241020.csv')
     return
 
 if __name__ == '__main__':
