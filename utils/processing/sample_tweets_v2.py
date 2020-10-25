@@ -169,7 +169,7 @@ def cleaning_f():
     print('Number of remaining tweets before keyword matching: ' , len_sample)
     
     # Select tweets based on keyword matching
-    keyword_bool = sample_df.text.str.contains(r'wear|mask|respirator|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
+    keyword_bool = sample_df.text.str.contains(r'\bwear|mask|respirators?\b|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
     print('Number of relevant tweets: ',len(clean_sample))
     # Write sample file
