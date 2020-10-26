@@ -163,7 +163,7 @@ def dump_interaction_counts(interaction_counts):
         pickle.dump(dict(interaction_counts), f)
     return f_name
 
-def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpu=None):
+def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpus=None):
     def extract_tweets(day, f_names, keywords):
         gc = Geocode()
         gc.init()
@@ -192,7 +192,10 @@ def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract
                 try:
                     tweet = json.loads(line)
                 except json.decoder.JSONDecodeError:
-                    # some files use single quotation, for this we need to use ast.literal_eval
+                    if isinstance(line, bytes):
+                        # gzip.open will provide file in bytes format, in this case deocde
+                        line = line.decode()
+                    # some files use single quotation (Python dictionaries), for this we need to use ast.literal_eval
                     tweet = ast.literal_eval(line)
                 except:
                     # sometimes parsing completely fails
