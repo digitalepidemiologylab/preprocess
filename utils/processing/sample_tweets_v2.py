@@ -123,8 +123,11 @@ def cleaning_f():
 
     # **Select the potentially relevant tweets**
     
-    # Remove gibberish
-    sample_df = sample_df.loc[sample_df.text.str.len()>5].copy()
+    # Remove tweets with less than 5 words
+    boolean_l = [len(sample_df.text.str.split().iloc[i]) > 4 for i in range(len(sample_df))]
+    sample_df = sample_df[boolean_l].copy()
+    # Remove tweets with less than 11 characters
+    sample_df = sample_df.loc[sample_df.text.str.len()>11].copy()
     
     # Compute the number of remaining tweets
     len_sample = len(sample_df)
@@ -149,31 +152,31 @@ def cleaning_f():
             bool_list.append(0)
         return bool_list 
     
-    idx_couples = str_combination_gen(sample_df)
-    lev_distance_delayed = joblib.delayed(lev_distance)
-    parallel = joblib.Parallel(n_jobs = 8)
-    bool_list = parallel(lev_distance_delayed(*arg) for arg in idx_couples)
-    bool_arr = np.reshape(np.array(bool_list), len(bool_list))
-    l_arr = np.zeros((len_sample, len_sample))
-    indices = np.tril_indices(len_sample)
-    l_arr[indices] = bool_arr
-    l_df = pd.DataFrame(l_arr, index=sample_df.index, columns=sample_df.index)
+    #idx_couples = str_combination_gen(sample_df)
+    #lev_distance_delayed = joblib.delayed(lev_distance)
+    #parallel = joblib.Parallel(n_jobs = 8)
+    #bool_list = parallel(lev_distance_delayed(*arg) for arg in idx_couples)
+    #bool_arr = np.reshape(np.array(bool_list), len(bool_list))
+    #l_arr = np.zeros((len_sample, len_sample))
+    #indices = np.tril_indices(len_sample)
+    #l_arr[indices] = bool_arr
+    #l_df = pd.DataFrame(l_arr, index=sample_df.index, columns=sample_df.index)
     
     # Indices that correspond to unique text entries
-    ndup_idx = l_df[l_df.sum(axis=0)==1].index
+    #ndup_idx = l_df[l_df.sum(axis=0)==1].index
     # Keep the original tweets
-    sample_df = sample_df.loc[ndup_idx]
+    #sample_df = sample_df.loc[ndup_idx]
     
     # Compute the number of remaining tweets
     len_sample = len(sample_df)
     print('Number of remaining tweets before keyword matching: ' , len_sample)
     
     # Select tweets based on keyword matching
-    keyword_bool = sample_df.text.str.contains(r'\bwear|mask|respirators?\b|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
+    keyword_bool = sample_df.text.str.contains(r'masks?|respirators?\b|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
     print('Number of relevant tweets: ',len(clean_sample))
     # Write sample file
-    clean_sample.to_csv('../../data/2_sampled/sample_fp241020.csv')
+    clean_sample.to_csv('../../data/2_sampled/sample_fp261020.csv')
     return
 
 if __name__ == '__main__':
