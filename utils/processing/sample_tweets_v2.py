@@ -60,21 +60,21 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-def cleaning_f():
+def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet', 'user.description']):
     # Load data
-    df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet', 'user.description'])
+    df = get_parsed_data(num_files=num_files, usecols=usecols)
     df.reset_index(drop=True, inplace=True)
-    cleanf_dict = {'language':'en', 'keywords': ['masks', 'respirators', 'ppe', 'npi', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
+    cleanf_dict = {'language': sel_lang, 'keywords': ['masks', 'respirators', 'ppe', 'npi', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
 
     # Take a sample
-    sample_df = df.sample(frac=0.02, random_state=0)
+    sample_df = df.sample(frac=frac, random_state=0)
     num_raw_samples = len(df)
 
     # Remove retweets
     sample_df = sample_df.loc[sample_df['is_retweet']!=True]
     
     # Select English tweets
-    sample_df = sample_df.loc[sample_df['lang']=='en'].copy()
+    sample_df = sample_df.loc[sample_df['lang']==sel_lang].copy()
     #Compute the number of remaining tweets
     len_sample = len(sample_df)
     print('Total number of English tweets: ', len_sample)
