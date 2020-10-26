@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import pdb
+import json
 import pandas as pd
 import numpy as np
 import joblib
@@ -14,6 +14,7 @@ from html.parser import HTMLParser
 import re
 # Import Python extension for computing string edit distances and similarities
 import Levenshtein as lev
+import pdb
 
 import sys
 sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
@@ -63,10 +64,12 @@ def cleaning_f():
     # Load data
     df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet', 'user.description'])
     df.reset_index(drop=True, inplace=True)
+    cleanf_dict = {'language':'en', 'keywords': ['masks', 'respirators', 'ppe', 'npi', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
 
     # Take a sample
     sample_df = df.sample(frac=0.02, random_state=0)
-    
+    num_raw_samples = len(df)
+
     # Remove retweets
     sample_df = sample_df.loc[sample_df['is_retweet']!=True]
     
@@ -127,7 +130,7 @@ def cleaning_f():
     boolean_l = [len(sample_df.text.str.split().iloc[i]) > 4 for i in range(len(sample_df))]
     sample_df = sample_df[boolean_l].copy()
     # Remove tweets with less than 11 characters
-    sample_df = sample_df.loc[sample_df.text.str.len()>11].copy()
+    sample_df = sample_df.loc[sample_df.text.str.len()>10].copy()
     
     # Compute the number of remaining tweets
     len_sample = len(sample_df)
@@ -174,9 +177,15 @@ def cleaning_f():
     # Select tweets based on keyword matching
     keyword_bool = sample_df.text.str.contains(r'masks?|respirators?\b|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
-    print('Number of relevant tweets: ',len(clean_sample))
+    final_len = len(clean_sample)
+    print('Number of relevant tweets: ',final_len)
     # Write sample file
     clean_sample.to_csv('../../data/2_sampled/sample_fp261020.csv')
+    output_data = {**cleanf_dict, 'num_raw_samples':num_raw_samples, 'final_len': final_len}
+    
+    with open('config_cleaning.json', 'w') as file:
+        json.dump(output_data, file)
+
     return
 
 if __name__ == '__main__':
