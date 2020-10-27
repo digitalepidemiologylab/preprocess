@@ -60,7 +60,7 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet', 'user.description']):
+def cleaning_f(num_files=10, frac=0.2, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet']):
     # Load data
     df = get_parsed_data(num_files=num_files, usecols=usecols)
     df.reset_index(drop=True, inplace=True)
@@ -84,27 +84,21 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
     html_parser = HTMLParser()
     # Escape HTML symbols
     sample_df.text = sample_df.text.apply(html_parser.unescape)
-    sample_df['user.description'] = sample_df['user.description'].apply(html_parser.unescape)
 
     # Replace suspension points with the standard dots
     sample_df.text = sample_df.text.str.replace('…','...')
-    sample_df['user.description'] = sample_df['user.description'].str.replace('…','...')
 
     # Normalize Unicode characters
     sample_df.text = sample_df.text.map(lambda x: unicodedata.normalize('NFKC', x))
-    sample_df['user.description'] = sample_df['user.description'].map(lambda x: unicodedata.normalize('NFKC', x))
 
     # Erase usernames
     sample_df.text = sample_df.text.str.replace(r'(^|[^@\w])@(\w{1,15})\b', '')
-    sample_df['user.description'] = sample_df['user.description'].replace(r'(^|[^@\w])@(\w{1,15})\b', '')
 
     # Erase URLs
     sample_df.text = sample_df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
-    sample_df['user.description'] = sample_df['user.description'].str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
 
     # Replace \t, \n and \r characters with a whitespace
     sample_df.text = sample_df.text.str.replace(r'[\r\n\t]+', ' ')
-    sample_df['user.description'] = sample_df['user.description'].str.replace(r'[\r\n\t]+', ' ') 
     
     def misc_rem(text):
         # Remove all emojis
@@ -122,15 +116,18 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
         return text
         
     sample_df.text = sample_df.text.apply(misc_rem)
-    sample_df['user.description'] = sample_df['user.description'].apply(misc_rem)
 
     # **Select the potentially relevant tweets**
-    
+
+    def word_len(word_arr):
+        return len(word_arr) > 4
+
     # Remove tweets with less than 5 words
-    boolean_l = [len(sample_df.text.str.split().iloc[i]) > 4 for i in range(len(sample_df))]
+    parallel = joblib.Parallel(n_jobs=8)
+    boolean_l = parallel(joblib.delayed(word_len)(sample_df.text.str.split().iloc[i]) for i in range(len(sample_df)))
     sample_df = sample_df[boolean_l].copy()
-    # Remove tweets with less than 11 characters
-    sample_df = sample_df.loc[sample_df.text.str.len()>10].copy()
+    # Remove tweets with less than 10 characters
+    sample_df = sample_df.loc[sample_df.text.str.len()>9].copy()
     
     # Compute the number of remaining tweets
     len_sample = len(sample_df)
@@ -175,12 +172,12 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
     print('Number of remaining tweets before keyword matching: ' , len_sample)
     
     # Select tweets based on keyword matching
-    keyword_bool = sample_df.text.str.contains(r'masks?|respirators?\b|\bppe\b|\bnpi\b|\bn95\b|\bkn95\b|\bffp2?\b')
+    keyword_bool = sample_df.text.str.contains(r'\bmasks?\b|\bface covers?\b|\bn95\b|\bkn95\b|\bffp2?\b')
     clean_sample = sample_df[keyword_bool]
     final_len = len(clean_sample)
     print('Number of relevant tweets: ',final_len)
     # Write sample file
-    clean_sample.to_csv('../../data/2_sampled/sample_fp261020.csv')
+    clean_sample.to_csv('../../data/2_sampled/sample_fp271020.csv')
     output_data = {**cleanf_dict, 'num_raw_samples':num_raw_samples, 'final_len': final_len}
     
     with open('config_cleaning.json', 'w') as file:
