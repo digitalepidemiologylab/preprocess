@@ -1,3 +1,47 @@
+"""
+The purpose of parse is to generate Parquet files from raw jsonl.gz files
+
+`parse` does three things:
+    * Extract relevant fields from tweets
+    * Tries to tie tweets to a geographical location (longitude/latitude point) using local-geocode
+    * converts raw gzipped raw data into daily Dataframes in parquet format (faster to read)
+
+The parsing takes place in two episodes:
+    1. Run extraction and count interactions (retweets, quotes, replies)
+    2. Merge interaction counts and write parquet files
+
+The purpose of these two episodes is to minimize memory (never having to fully load all data into memory).
+
+1. Run extraction
+-----------------
+Input: Raw data (jsonl.gz)
+Output: Daily jsonl files (called preliminary files) with the extracted tweets & interaction counts
+This function is parallelized using joblib. The interaction counts are held in a thread-safe shared read/write
+data structure called multiprocessing Manager dictionary (`manager.dict()`). Additional we keep a dictionary
+called `originals` to keep track of duplicates. Duplicates can appear "naturally" in the Twitter stream or when
+extracting "subtweets". Subtweets are either quotes statuses or retweeted statuses. We can control whether or not
+to extract these subtweets (using the `extract_quotes` and `extract_retweets` args). Note, that when subtweets are
+extracted they may have been tweeted several years in the past (before the time of data collection).
+
+2. Merge interactions
+--------------------
+Input: Preliminary jsonl files & interaction counts
+Output: Daily parquet files (written to data/1_parsed/tweets)
+This function is parallelized using ray. Ray allows for an arbitrary datastructure (in our case the interaction
+counts, which are held in a Pandas DataFrame) to be shared in a read-only way among multiple processes.
+The interaction counts are merged with the extracted tweets adding the columns num_retweets, num_quotes, and
+num_replies.
+
+Eventually all temporary files (preliminary files) are removed and the parquet files can be read in parallel with
+the `utils.helpers.get_parsed_data()` function.
+
+Notes:
+* This code was tested on a machine with 250GB of memory. Depending on data size or machine you may want to reduce
+the number of parallel workers (using the `--ray_num_cpus` argument).
+* After every run a .used_data file is written, keeping track of which raw files were already parsed. This allows
+to use the --extend keyword and add new data without re-parsing the whole raw data every time.
+* By default the last day (which is an incomplete day of collection) is ignored (see `--omit_last_day` argument)
+"""
 import pandas as pd
 from pathlib import Path
 import numpy as np
@@ -142,7 +186,6 @@ def write_parquet_file(f_path_intermediary, interaction_counts, extend=False):
     df.to_parquet(f_out)
     return len(df)
 
-
 def merge_interaction_counts():
     interaction_counts = pd.DataFrame({
         'num_quotes': pd.Series(dict(quote_counts)),
@@ -163,18 +206,7 @@ def dump_interaction_counts(interaction_counts):
         pickle.dump(dict(interaction_counts), f)
     return f_name
 
-def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpus=None):
-    """Reads raw data from ``.jsonl.gz`` files,
-    writes to preliminary JSONL files with all extrancted fields,
-    collects global engagement counts for every tweet ID,
-    which are then shared between the parallel processes, merged and
-    saved into ``.parquet`` files.
-
-    There're two types of dictionaries involved.
-    Multiprocessing read-write dictionaries and Ray read-only.
-    M. ones are used to keep count of quotes, replies and retweets.
-    R. ones are used in the end to merge everything.
-    """
+def run(no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpus=None):
     def extract_tweets(day, f_names, keywords):
         gc = Geocode()
         gc.init()
