@@ -60,11 +60,11 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-def cleaning_f(num_files=10, frac=0.2, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet']):
+def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet']):
     # Load data
     df = get_parsed_data(num_files=num_files, usecols=usecols)
     df.reset_index(drop=True, inplace=True)
-    cleanf_dict = {'language': sel_lang, 'keywords': ['masks', 'respirators', 'ppe', 'npi', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
+    cleanf_dict = {'language': sel_lang, 'keywords': ['masks', 'face covers', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
 
     # Take a sample
     sample_df = df.sample(frac=frac, random_state=0)
