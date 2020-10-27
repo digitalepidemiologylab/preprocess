@@ -164,6 +164,17 @@ def dump_interaction_counts(interaction_counts):
     return f_name
 
 def run(lang='en_core_web_sm', no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpus=None):
+    """Reads raw data from ``.jsonl.gz`` files,
+    writes to preliminary JSONL files with all extrancted fields,
+    collects global engagement counts for every tweet ID,
+    which are then shared between the parallel processes, merged and
+    saved into ``.parquet`` files.
+
+    There're two types of dictionaries involved.
+    Multiprocessing read-write dictionaries and Ray read-only.
+    M. ones are used to keep count of quotes, replies and retweets.
+    R. ones are used in the end to merge everything.
+    """
     def extract_tweets(day, f_names, keywords):
         gc = Geocode()
         gc.init()
