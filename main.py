@@ -91,7 +91,7 @@ class ArgParse(object):
         # seed
         # min_date, max_date
         args = parser.parse_args(sys.argv[2:])
-        sample_tweets.run()
+        sample_tweets.run(args)
 
     def batch(self):
         from utils.processing.sample_tweets import SampleGenerator
