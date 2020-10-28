@@ -8,19 +8,22 @@ import joblib
 import multiprocessing
 import unicodedata
 import emoji
-
 from html.parser import HTMLParser
 # Import module for regular expressions
 import re
 # Import Python extension for computing string edit distances and similarities
 import Levenshtein as lev
 import pdb
-
+import logging
 import sys
+from tqdm import tqdm
+from datetime import datetime
 sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
 # sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
+from utils.helpers import get_parsed_data, find_project_root
+import uuid
 
-from utils.helpers import get_parsed_data
+logger = logging.getLogger(__name__)
 
 # Available columns:
 # id                                     object
@@ -60,83 +63,113 @@ from utils.helpers import get_parsed_data
 # num_replies                             int64
 # num_retweets                            int64
 
-def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'lang', 'is_retweet']):
+def run(args):
+    # keep track of lengths
+    df_len = {}
+
     # Load data
-    df = get_parsed_data(num_files=num_files, usecols=usecols)
+    logger.info('Reading raw data...')
+    df = get_parsed_data(num_files=10, usecols=['id', 'text', 'lang', 'is_retweet'])
+    logger.info(f'... read a total of {len(df):,} tweets')
     df.reset_index(drop=True, inplace=True)
-    cleanf_dict = {'language': sel_lang, 'keywords': ['masks', 'face covers', 'n95', 'kn95', 'ffp2'],'min_char_len': 10, 'min_word_len': 5}
+    df_len['0_read'] = len(df)
+
+    min_num_tokens = 5
+    min_num_chars = 10
+    keywords = ['masks', 'face covers', 'n95', 'kn95', 'ffp2']
+    lang = 'en'
+    exec_time = datetime.now().timestamp()
 
     # Take a sample
-    sample_df = df.sample(frac=frac, random_state=0)
     num_raw_samples = len(df)
+    df = df.sample(frac=.2, random_state=0)
+
+# d => delete and stay in normal mode
+# c => delete and enter insert mode
+# cw => delete up to the next word
+# ciw => delete within the current word
+# . => repeat previous action (e.g. replacement)
+# { move paragraph down
+# } move paragraph up
+# / search, use n to go to next, use N to go to previous
+# gcc comment in any language (tpop/tcomment_vim plugin)
+# V visual select line
 
     # Remove retweets
-    sample_df = sample_df.loc[sample_df['is_retweet']!=True]
-    
+    logger.info('Removing retweets...')
+    df = df[~df.is_retweet]
+    logger.info(f'... {len(df):,} remaining')
+    df_len['1_remove_retweets'] = len(df)
+
     # Select English tweets
-    sample_df = sample_df.loc[sample_df['lang']==sel_lang].copy()
-    #Compute the number of remaining tweets
-    len_sample = len(sample_df)
-    print('Total number of English tweets: ', len_sample)
-    
-    # **Cleaning the data**
+    logger.info(f'Filter by lang {lang}...')
+    df = df[df.lang==lang]
+    logger.info(f'... {len(df):,} remaining')
+    df_len['2_remove_lang'] = len(df)
+
+    # General cleaning of data
     # Create an instance of a HTML parser
     html_parser = HTMLParser()
+
     # Escape HTML symbols
-    sample_df.text = sample_df.text.apply(html_parser.unescape)
+    df.text = df.text.apply(html_parser.unescape)
 
     # Replace suspension points with the standard dots
-    sample_df.text = sample_df.text.str.replace('…','...')
+    df.text = df.text.str.replace('…','...')
 
     # Normalize Unicode characters
-    sample_df.text = sample_df.text.map(lambda x: unicodedata.normalize('NFKC', x))
+    df.text = df.text.map(lambda x: unicodedata.normalize('NFKC', x))
 
     # Erase usernames
-    sample_df.text = sample_df.text.str.replace(r'(^|[^@\w])@(\w{1,15})\b', '')
+    df.text = df.text.str.replace(r'(^|[^@\w])@(\w{1,15})\b', '')
 
     # Erase URLs
-    sample_df.text = sample_df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
+    df.text = df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
 
-    # Replace \t, \n and \r characters with a whitespace
-    sample_df.text = sample_df.text.str.replace(r'[\r\n\t]+', ' ')
+    # Select tweets based on keyword matching
+    logger.info(f'Filter by keywords {keywords}...')
+    df = df[df.text.str.contains(r'\bmasks?\b|\bface covers?\b|\bn95\b|\bkn95\b|\bffp2?\b')]
+    logger.info(f'... {len(df):,} remaining')
+    df_len['3_keep_keywords'] = len(df)
+    # Create copy of text column
+    df['text_cleaned'] = df['text']
     
+    # Operations for filtering near-duplicates
     def misc_rem(text):
         # Remove all emojis
         text = ''.join('' if unicodedata.category(c)[0] == 'S' else c for c in text)
-        # Remove all remaining control characters
-        text = ''.join(ch for ch in text if unicodedata.category(ch)[0] != 'C')
-        
+
         # Replace multiple spaces with a single space
         text = ' '.join(text.split())
         text = text.strip()
         
         # Transform to lower-case characters
         text = text.lower()
-        
         return text
         
-    sample_df.text = sample_df.text.apply(misc_rem)
+    df['text_cleaned'] = df.text_cleaned.apply(misc_rem)
 
-    # **Select the potentially relevant tweets**
-
-    def word_len(word_arr):
-        return len(word_arr) > 4
-
+    # def word_len(word_arr):
+    #     # split
+    #     return len(word_arr) > 4
     # Remove tweets with less than 5 words
-    parallel = joblib.Parallel(n_jobs=8)
-    boolean_l = parallel(joblib.delayed(word_len)(sample_df.text.str.split().iloc[i]) for i in range(len(sample_df)))
-    sample_df = sample_df[boolean_l].copy()
+    # parallel = joblib.Parallel(n_jobs=8)
+    # boolean_l = parallel(joblib.delayed(word_len)(df.text.str.split().iloc[i]) for i in range(len(df)))
+    # df = df[boolean_l].copy()
+
+    logger.info(f'Filter by min_num_tokens {min_num_tokens}...')
+    df['num_tokens'] = df.text_cleaned.apply(lambda s: len(s.split()))
+    df = df[df.num_tokens > min_num_tokens]
+    logger.info(f'... {len(df):,} remaining')
+    df_len['4_remove_min_num_tokens'] = len(df)
+
     # Remove tweets with less than 10 characters
-    sample_df = sample_df.loc[sample_df.text.str.len()>9].copy()
-    
-    # Compute the number of remaining tweets
-    len_sample = len(sample_df)
-    print('Total number of potentially relevant English tweets: ', len_sample)
-    
-    # **Removing near-duplicates and selecting tweets based on keyword matching**
+    logger.info(f'Filter by min_num_chars {min_num_chars}...')
+    df = df[df.text_cleaned.str.len() > min_num_chars]
+    logger.info(f'... {len(df):,} remaining')
+    df_len['5_remove_min_num_chars'] = len(df)
     
     #Empty array to be filled with indices corresponding to near-duplicates
-    
     def str_combination_gen(dfr):
         for i in range(len(dfr)):
             for j in range(i+1):
@@ -144,7 +177,7 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
         
     def lev_distance(text1,text2):
         bool_list=[]
-        # Identify near-duplicates within sample_df		
+        # Identify near-duplicates within df		
         if lev.distance(text1, text2)<10:
             # Add new near-duplicates to the array dup_idx 
             bool_list.append(1)
@@ -152,7 +185,7 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
             bool_list.append(0)
         return bool_list 
     
-    #idx_couples = str_combination_gen(sample_df)
+    #idx_couples = str_combination_gen(df)
     #lev_distance_delayed = joblib.delayed(lev_distance)
     #parallel = joblib.Parallel(n_jobs = 8)
     #bool_list = parallel(lev_distance_delayed(*arg) for arg in idx_couples)
@@ -160,30 +193,36 @@ def cleaning_f(num_files=10, frac=0.02, sel_lang='en', usecols=['id', 'text', 'l
     #l_arr = np.zeros((len_sample, len_sample))
     #indices = np.tril_indices(len_sample)
     #l_arr[indices] = bool_arr
-    #l_df = pd.DataFrame(l_arr, index=sample_df.index, columns=sample_df.index)
+    #l_df = pd.DataFrame(l_arr, index=df.index, columns=df.index)
     
     # Indices that correspond to unique text entries
     #ndup_idx = l_df[l_df.sum(axis=0)==1].index
     # Keep the original tweets
-    #sample_df = sample_df.loc[ndup_idx]
+    #df = df.loc[ndup_idx]
     
-    # Compute the number of remaining tweets
-    len_sample = len(sample_df)
-    print('Number of remaining tweets before keyword matching: ' , len_sample)
-    
-    # Select tweets based on keyword matching
-    keyword_bool = sample_df.text.str.contains(r'\bmasks?\b|\bface covers?\b|\bn95\b|\bkn95\b|\bffp2?\b')
-    clean_sample = sample_df[keyword_bool]
-    final_len = len(clean_sample)
-    print('Number of relevant tweets: ',final_len)
-    # Write sample file
-    clean_sample.to_csv('../../data/2_sampled/sample_fp271020.csv')
-    output_data = {**cleanf_dict, 'num_raw_samples':num_raw_samples, 'final_len': final_len}
-    
-    with open('config_cleaning.json', 'w') as file:
-        json.dump(output_data, file)
+    # Drop duplicates
+    logger.info('Drop near-duplicates...')
+    df = df.drop_duplicates(subset=['text_cleaned'])
+    logger.info(f'... {len(df):,} remaining')
+    df_len['6_remove_near-duplicates'] = len(df)
 
-    return
+    # Write sample file
+    f_out_folder = os.path.join(find_project_root(), 'data', '2_sampled')
+    random_hash = str(uuid.uuid4())[:8]
+
+    f_name = f'sample_{random_hash}.csv'
+    df[['id', 'text']].to_csv(os.path.join(f_out_folder, f_name), index=False)
+
+
+    output_data = {**args, **df_len, 'keywords': keywords, 'lang': lang, 'min_num_chars': min_num_chars, 'min_num_tokens': min_num_tokens, 'timestamp': exec_time}
+    # add length after every cleaning step
+    # all args (keywords, lang, ...)
+    # add current timestamp
+
+    f_out_config_path = os.path.join(f_out_folder, f'sample_{random_hash}_config.json')
+    with open(f_out_config_path, 'w') as f:
+        json.dump(output_data, f)
+
 
 if __name__ == '__main__':
-    cleaning_f()
+    run({})
