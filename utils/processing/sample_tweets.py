@@ -244,7 +244,7 @@ def run(size=None, langs=None, include_replies=False, anonymize=True, contains_k
     # Filter by date
     if min_date is not None or max_date is not None:
         logger.info('Filtering by dates...')
-        df = df[min_date:max_date]
+        df = df.set_index('created_at')[min_date:max_date].reset_index()
     # Min token count
     if isinstance(min_token_count, int):
         logger.info('Filtering by min_token_count...')

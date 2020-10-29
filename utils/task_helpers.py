@@ -2,13 +2,18 @@ import logging
 from collections import Counter
 import os
 import json
-from utils.helpers import find_folder, get_cleaned_labelled_data, get_project_info, find_project_root
+from utils.helpers import find_folder, get_cleaned_labelled_data, get_project_info, find_project_root, get_parsed_data
 from utils.s3_helper import S3Helper
 from utils.stats import Stats
 from utils.misc import JSONEncoder
+from utils.process_tweet import ProcessTweet
 import pandas as pd
 import numpy as np
 import glob
+from datetime import datetime
+import joblib
+import multiprocessing
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -100,3 +105,38 @@ def stats(stats_type, **args):
     else:
         raise ValueError('Command {} is not available.'.format(stats_type))
     print(stats.text)
+
+
+def prepare_predict(args):
+    # paths
+    date_key = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    f_out_folder = os.path.join(find_project_root(), 'data', 'other', 'prepare_prediction', date_key)
+    f_path_txt = os.path.join(f_out_folder, 'text.csv')
+    f_path_meta = os.path.join(f_out_folder, 'id_created_at.csv')
+    if os.path.isdir(f_out_folder):
+        raise Exception(f'Folder {f_out_folder} already exists')
+    os.makedirs(f_out_folder)
+    # read data
+    logger.info('Reading raw data...')
+    df = get_parsed_data(num_files=None, s_date=args.start_date, e_date=args.end_date, usecols=['id', 'created_at', 'text'])
+    if args.start_date is not None:
+        df = df[df.created_at > args.start_date]
+    if args.end_date is not None:
+        df = df[df.created_at > args.end_date]
+    logger.info('Sorting...')
+    df = df.sort_values('created_at')
+    if args.anonymize:
+        def anonymize(df_chunk):
+            return df_chunk.apply(ProcessTweet.anonymize_text, url_filler=args.url_filler, user_filler=args.user_filler)
+
+        logger.info('Anonymize...')
+        anonymize_delayed = joblib.delayed(anonymize)
+        num_cores = max(multiprocessing.cpu_count() - 1, 1)
+        parallel = joblib.Parallel(n_jobs=num_cores)
+        res = parallel(anonymize_delayed(df_chunk) for df_chunk in tqdm(np.array_split(df['text'], num_cores), unit='chunk'))
+        df['text'] = pd.concat(res)
+    # write data
+    logger.info(f'Writing text column to {f_path_txt}...')
+    df[['text']].to_csv(f_path_txt, index=False)
+    logger.info(f'Writing id/created_at column to {f_path_meta}...')
+    df[['id', 'created_at']].to_csv(f_path_meta, index=False)

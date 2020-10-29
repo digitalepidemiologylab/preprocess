@@ -8,13 +8,13 @@ python main.py <command> [<args>]
 
 Available commands:
   init             Initialize project
+  sync             Sync project data from S3
   parse            Preprocessing of data to generate `/data/1_parsed`
   sample           Sample cleaned data to generate `data/2_sampled`
   batch            Creates a new batch of tweets from a sampled file in `/data/2_sampled`
   clean_labels     Clean labels generated from (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
   split            Splits data into training, dev and test data
-  sync             Sync project data from S3
 """
 
 STATS_USAGE_DESC = """
@@ -50,6 +50,14 @@ class ArgParse(object):
         parser.add_argument('--template', dest='template', action='store_true', default=False, help='Initialize project manually.')
         args = parser.parse_args(sys.argv[2:])
         init(args.project, args.template)
+
+    def sync(self):
+        from utils.task_helpers import sync
+        parser = ArgParseDefault(description='Sync project data from S3')
+        parser.add_argument('-s', '--source', choices=['all', 'streaming', 'annotation', 'media'], required=False, default='all', help='Type of data to be synced. By default sync all data belonging to this project.')
+        parser.add_argument('-l', '--last', required=False, type=int, help='Sync streaming data of last n days')
+        args = parser.parse_args(sys.argv[2:])
+        sync(data_type=args.source, last_n_days=args.last)
 
     def parse(self):
         import utils.processing.parse_tweets as parse_tweets
@@ -148,14 +156,19 @@ class ArgParse(object):
         parser.add_argument('--seed', type=int, required=False, default=42, help='Random state split')
         args = parser.parse_args(sys.argv[2:])
         train_dev_test_split(question=args.question, dev_size=args.dev_size, test_size=args.test_size, seed=args.seed, name=args.name, balanced_labels=args.balanced_labels, all_questions=args.all_questions, label_tags=args.label_tags, has_label=args.has_label)
-
-    def sync(self):
-        from utils.task_helpers import sync
-        parser = ArgParseDefault(description='Sync project data from S3')
-        parser.add_argument('-s', '--source', choices=['all', 'streaming', 'annotation', 'media'], required=False, default='all', help='Type of data to be synced. By default sync all data belonging to this project.')
-        parser.add_argument('-l', '--last', required=False, type=int, help='Sync streaming data of last n days')
+    
+    def prepare_predict(self):
+        from utils.task_helpers import prepare_predict
+        parser = ArgParseDefault(description='Prepare data for prediction with the text-classification library. \
+                This function generates two files (1 for text 1 for IDs/created_at) under data/other. The text.csv file can then be predicted.')
+        parser.add_argument('--start_date', required=False, default=None, help='Filter start date')
+        parser.add_argument('--end_date', required=False, default=None, help='Filter end date')
+        add_bool_arg(parser, 'anonymize', default=True, help='Replace usernames and URLs with filler (@user and <url>)')
+        parser.add_argument('--url_filler', required=False, default='<url>', help='Filler for urls (if anonymize)')
+        parser.add_argument('--user_filler', required=False, default='@user', help='Filler for user names (if anonymize)')
         args = parser.parse_args(sys.argv[2:])
-        sync(data_type=args.source, last_n_days=args.last)
+        prepare_predict(args)
+
 
 if __name__ == '__main__':
     ArgParse()

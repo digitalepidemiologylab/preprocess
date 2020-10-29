@@ -37,6 +37,7 @@ def get_parsed_data(contains_keywords=False, usecols=None, s_date=None, e_date=N
         data_folder = get_data_folder()
         f_path = os.path.join(data_folder, '1_parsed', 'tweets', '*.parquet')
         f_names = glob.glob(f_path)
+        f_names = sorted(f_names)
         if s_date is not None or e_date is not None:
             f_names_dates = {f_name: parse_date_from_f_name(f_name) for f_name in f_names}
             if s_date is not None:
@@ -327,40 +328,6 @@ def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=No
         df = df.reset_index()
         df = pd.concat([df, df_geo], axis=1)
         df = df.set_index('created_at')
-    return df
-
-def read_raw_data_from_csv(f_path, dtype, frac=1, nrows=None, skiprows=None, usecols=None, parallel=False, set_index='created_at'):
-    def env_is_true(env_var):
-        env_var = os.environ.get(env_var, '')
-        return env_var == '1' or env_var.lower() == 'true'
-    dtypes = get_dtypes(usecols=usecols)
-    if parallel or env_is_true('PARALLEL'):
-        try:
-            import modin.pandas as pd
-        except:
-            # Fallback to normal pandas
-            import pandas as pd
-    else:
-        import pandas as pd
-    if not (isinstance(frac, int) or isinstance(frac, float)):
-        raise ValueError('Frac has to be of type integer or float')
-    if frac < 0 or frac > 1:
-        raise ValueError('Frac should be between 0 and 1')
-    if int(frac) == 1 and nrows is None and skiprows is None:
-        df = pd.read_csv(f_path, encoding='utf8', dtype=dtypes, usecols=usecols)
-    else:
-        # read only fraction of csv
-        if nrows is None:
-            with open(f_path, 'r') as csvfile:
-                total_rows = sum(1 for row in csvfile)
-            nrows = int(frac*total_rows)
-        df = pd.read_csv(f_path, dtype=dtypes, encoding='utf8', usecols=usecols, nrows=nrows, skiprows=skiprows)
-    if len(df) == 0:
-        return df
-    if 'created_at' in df:
-        df['created_at'] = pd.to_datetime(df['created_at'].values, utc=True)
-    if set_index is not None and set_index in df:
-        df.set_index(set_index, drop=True, inplace=True)
     return df
 
 def get_dtypes(usecols=None):
