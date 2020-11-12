@@ -15,6 +15,7 @@ import re
 import Levenshtein as lev
 import pdb
 import logging
+import os
 import sys
 from tqdm import tqdm
 from datetime import datetime
@@ -24,44 +25,6 @@ from utils.helpers import get_parsed_data, find_project_root
 import uuid
 
 logger = logging.getLogger(__name__)
-
-# Available columns:
-# id                                     object
-# text                                   object
-# in_reply_to_status_id                  object
-# in_reply_to_user_id                    object
-# quoted_user_id                         object
-# quoted_status_id                       object
-# retweeted_user_id                      object
-# retweeted_status_id                    object
-# created_at                datetime64[ns, UTC]
-# entities.user_mentions                 object
-# user.id                                object
-# user.screen_name                       object
-# user.name                              object
-# user.description                       object
-# user.timezone                          object
-# user.location                          object
-# user.num_followers                      int64
-# user.num_following                      int64
-# user.created_at           datetime64[ns, UTC]
-# user.statuses_count                     int64
-# user.is_verified                         bool
-# lang                                 category
-# token_count                             int64
-# is_retweet                               bool
-# has_quote                                bool
-# is_reply                                 bool
-# contains_keywords                        bool
-# longitude                             float64
-# latitude                              float64
-# country_code                         category
-# region                               category
-# subregion                            category
-# geo_type                             category
-# num_quotes                              int64
-# num_replies                             int64
-# num_retweets                            int64
 
 def run(args):
     # keep track of lengths
@@ -83,17 +46,6 @@ def run(args):
     # Take a sample
     num_raw_samples = len(df)
     df = df.sample(frac=.2, random_state=0)
-
-# d => delete and stay in normal mode
-# c => delete and enter insert mode
-# cw => delete up to the next word
-# ciw => delete within the current word
-# . => repeat previous action (e.g. replacement)
-# { move paragraph down
-# } move paragraph up
-# / search, use n to go to next, use N to go to previous
-# gcc comment in any language (tpop/tcomment_vim plugin)
-# V visual select line
 
     # Remove retweets
     logger.info('Removing retweets...')
@@ -207,19 +159,21 @@ def run(args):
     df_len['6_remove_near-duplicates'] = len(df)
 
     # Write sample file
-    f_out_folder = os.path.join(find_project_root(), 'data', '2_sampled')
+    # f_out_folder = os.path.join(find_project_root(), 'data', '2_sampled')
+    f_out_folder = os.path.join('..', '..', 'data', '2_sampled')
     random_hash = str(uuid.uuid4())[:8]
 
-    f_name = f'sample_{random_hash}.csv'
-    df[['id', 'text']].to_csv(os.path.join(f_out_folder, f_name), index=False)
-
+    f_name = f'sampled_{random_hash}_data.csv'
+    # df[['id', 'text']].to_csv(os.path.join(f_out_folder, f_name), index=False)
+    df[['id', 'text']].to_csv(os.path.join(f_out_folder,f_name), index=False)
 
     output_data = {**args, **df_len, 'keywords': keywords, 'lang': lang, 'min_num_chars': min_num_chars, 'min_num_tokens': min_num_tokens, 'timestamp': exec_time}
     # add length after every cleaning step
     # all args (keywords, lang, ...)
     # add current timestamp
 
-    f_out_config_path = os.path.join(f_out_folder, f'sample_{random_hash}_config.json')
+    # f_out_config_path = os.path.join(f_out_folder, f'sample_{random_hash}_config.json')
+    f_out_config_path = os.path.join(f_out_folder, f'sampled_{random_hash}_config.json')
     with open(f_out_config_path, 'w') as f:
         json.dump(output_data, f)
 
