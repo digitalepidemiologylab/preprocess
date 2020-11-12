@@ -84,7 +84,6 @@ class SampleGenerator(object):
             sample.to_csv(full_path, encoding='utf8')
         else:
             sample[columns].to_csv(full_path, encoding='utf8', index=False, header=False)
-
     # methods for distribution analysis
 
     def monthdelta(self, date, base):
