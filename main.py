@@ -85,11 +85,12 @@ class ArgParse(object):
     def sample_v2(self):
         import utils.processing.sample_tweets_v2 as sample_tweets
         parser = ArgParseDefault(description='Sample cleaned data to generate `data/2_sampled`')
-        # size parameter: Size of sample
+        # parser.add_argument('-s', '--size', type=int, required=True, dest='size', help='Number of tweets to sample') # size parameter: Size of sample
         # contains keywords (nargs='+')
-        # langs
-        # seed
-        # min_date, max_date
+        # parser.add_argument('-l', '--langs', default=[], nargs='+' required=False, help='Filter by language(s)') # langs
+        # parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split') # seed
+        # parser.add_argument('--max-date', dest='max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max') # max_date
+        # parser.add_argument('--min-date', dest='min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min') # min_date
         args = parser.parse_args(sys.argv[2:])
         sample_tweets.run(args)
 
