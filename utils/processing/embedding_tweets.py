@@ -47,7 +47,7 @@ def emb_pca():
     # Get the DataFrame from the Numpy array
     emb_df = pd.DataFrame(emb_arr)
     # Export the DataFrame to a CSV File
-    emb_df.to_csv('sample_for_pca.tsv', sep='\t', index=False, header=False)
+    emb_df.to_csv('sample_for_pca.csv', sep='\t', index=False, header=False)
     # Create a PCA transformer
     U, S, V = torch.pca_lowrank(norm_emb_mean, center=True, niter=2)
     # Project data onto the first two principal components
