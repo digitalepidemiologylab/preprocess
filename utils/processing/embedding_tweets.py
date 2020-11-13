@@ -60,6 +60,5 @@ def emb_pca():
     plt.ylabel('2nd component')
     fig.savefig('PCA_2d.png')
     return
-
 if __name__== '__main__':
     emb_pca()
