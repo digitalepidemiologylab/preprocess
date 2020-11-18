@@ -43,24 +43,23 @@ def emb_pca():
     norm_emb = scaler.call(last_hidden_states)
     # Keep the matrix that corresponds to the CLS token
     norm_emb = norm_emb[:,0,:]
-    __import__('pdb').set_trace()
     # Get the Numpy array from the tensor
     emb_arr = norm_emb.detach().numpy()
     # Get the DataFrame from the Numpy array
     emb_df = pd.DataFrame(emb_arr)
     # Export the DataFrame to a CSV File
-    emb_df.to_csv('sample_for_pca.csv', sep='\t', index=False, header=False)
+    # emb_df.to_csv('sample_for_pca.csv', sep='\t', index=False, header=False)
     # Create a PCA transformer
     U, S, V = torch.pca_lowrank(norm_emb, center=True, niter=2)
     # Project data onto the first two principal components
-    X_2d = torch.matmul(norm_emb, V[:,:2])
-    # plt.scatter(X_2d[:,0], X_2d[:,1])
-    # # Labels and legend
-    # plt.legend()
-    # plt.xlabel('1st component')
-    # plt.ylabel('2nd component')
-    # plt.show()
-    return 
+    X_2d = torch.matmul(norm_emb, V[:,:2]).detach().numpy()
+    fig = plt.figure()
+    plt.scatter(X_2d[:,0], X_2d[:,1])
+    # Labels and legend
+    plt.xlabel('1st component')
+    plt.ylabel('2nd component')
+    fig.savefig('PCA_2d.png')
+    return
 
 if __name__== '__main__':
     emb_pca()
