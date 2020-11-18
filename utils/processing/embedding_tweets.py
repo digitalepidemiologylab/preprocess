@@ -41,17 +41,19 @@ def emb_pca():
     scaler = TorchStandardScaler()
     scaler.adapt(last_hidden_states)
     norm_emb = scaler.call(last_hidden_states)
-    norm_emb_mean = torch.mean(norm_emb, 1, keepdim=False)
+    # Keep the matrix that corresponds to the CLS token
+    norm_emb = norm_emb[:,0,:]
+    __import__('pdb').set_trace()
     # Get the Numpy array from the tensor
-    emb_arr = norm_emb_mean.detach().numpy()
+    emb_arr = norm_emb.detach().numpy()
     # Get the DataFrame from the Numpy array
     emb_df = pd.DataFrame(emb_arr)
     # Export the DataFrame to a CSV File
     emb_df.to_csv('sample_for_pca.csv', sep='\t', index=False, header=False)
     # Create a PCA transformer
-    U, S, V = torch.pca_lowrank(norm_emb_mean, center=True, niter=2)
+    U, S, V = torch.pca_lowrank(norm_emb, center=True, niter=2)
     # Project data onto the first two principal components
-    X_2d = torch.matmul(norm_emb_mean, V[:,:2])
+    X_2d = torch.matmul(norm_emb, V[:,:2])
     # plt.scatter(X_2d[:,0], X_2d[:,1])
     # # Labels and legend
     # plt.legend()
