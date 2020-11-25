@@ -132,7 +132,6 @@ def run(dtype='anonymized', size=None, bin_size=None, langs='en', include_replie
 
     logger.info(f'Read a total of {len(df):,} tweets. Filtering...')
     flags = ''
-
     df.reset_index(drop=True, inplace=True)
     min_num_tokens = 5
     min_num_chars = 10
