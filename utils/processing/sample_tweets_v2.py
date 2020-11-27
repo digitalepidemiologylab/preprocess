@@ -24,9 +24,9 @@ import time
 import sys
 import glob
 import logging
-sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
+# sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
 # sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
-# sys.path.append('../..')
+sys.path.append('../..')
 from utils.helpers import get_parsed_data, get_sampled_data, get_labelled_data, get_cleaned_labelled_data, get_uploaded_batched_data, get_batched_sample_data, find_folder, #find_project_root 
 from utils.process_tweet import ProcessTweet
 
@@ -248,11 +248,11 @@ class SampleGenerator(object):
         return self.indices, self.days, self.months, self.years 
 
 
-# def run(args):
-def run(size=None, langs=None, include_replies=False, anonymize=True, contains_keywords=False, min_token_count=5, min_char_count=10, mode='monthly', seed=None, extend=False, bin_size=None, min_date=None, max_date=None): 
-args_dict = {'size': size, 'langs': langs, 'include_replies': include_replies, 'anonymize': anonymize, 
-            'contains_keywords': contains_keywords, 'min_token_count': min_token_count, 'min_char_count': min_char_count,
-            'mode': mode, 'seed': seed, 'extend': extend, 'bin_size': bin_size, 'min_date': min_date, 'max_date': max_date}
+def run(size=None, bin_size=None, mode='monthly', langs=None, min_date=None, max_date=None, min_token_count=None, min_char_count=None, anonymize=True, contains_keywords=False, include_replies=False, seed=None, extend=False): 
+    args_dict = {'size': size, 'bin_size': bin_size, 'mode': mode, 'langs': langs, 
+                'min_date': min_date, 'max_date': max_date,'min_token_count': min_token_count, 'min_char_count': min_char_count, 
+                'anonymize': anonymize, 'contains_keywords': contains_keywords, 'include_replies': include_replies, 
+                'seed': seed, 'extend': extend}
     if bin_size is None:
         logger.info('Creating sample of size {:,}...'.format(size))
     else:
@@ -335,11 +335,8 @@ args_dict = {'size': size, 'langs': langs, 'include_replies': include_replies, '
 
     # Anonymize: erase URLs and usernames
     if anonymize:
-        # Erase usernames
-        df.text = df.text.str.replace(r'(^|[^@\w])@(\w{1,15})\b', '')
-    
-        # Erase URLs
-        df.text = df.text.str.replace(r'((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))','')
+        logger.info('Anonymizing sample...')
+        sample.loc[:, 'text'] = sample.text.apply(ProcessTweet.anonymize_text)
 
     # Create copy of text column
     df['text_cleaned'] = df['text']
@@ -359,23 +356,23 @@ args_dict = {'size': size, 'langs': langs, 'include_replies': include_replies, '
         
     df['text_cleaned'] = df.text_cleaned.apply(misc_rem)
 
-    # Before removing duplicates and near-duplicates, apply additional filters (number of tokens, number of characters, presence of keywords)
-    # Filter tweets with less than 5 tokens
-    logger.info(f'Filter by min_num_tokens {min_num_tokens}...')
+    # Before removing duplicates and near-duplicates, apply additional filters: number of tokens, number of characters, verification of the origin of the data (keep only data collected with Twitter filter keywords if the raw data contains other sources)
+    # Filter tweets with less than 'min_token_count' tokens
+    logger.info(f'Filter by min_token_count {min_token_count}...')
     df['token_count'] = df.text_cleaned.apply(lambda s: len(s.split()))
     df = df[df.token_count > min_token_count]
     logger.info(f'... {len(df):,} remaining')
     df_len['5_token_count'] = len(df)
 
-    # Filter tweets with less than 10 characters
-    logger.info(f'Filter by min_num_chars {min_num_chars}...')
+    # Filter tweets with less than 'min_char_count' characters
+    logger.info(f'Filter by min_char_count {min_char_count}...')
     df = df[df.text_cleaned.str.len() > min_char_count]
     logger.info(f'... {len(df):,} remaining')
     df_len['6_char_count'] = len(df)
 
-    # Store the value of contain_keywords passed to get_parsed_data
+    # Store the value of contain_keywords passed to get_parsed_data ('keywords' mentioned in 'contains_keywords' refer to Twitter filter keywords)
     if contains_keywords:
-        # data was already filtered if contains_keywords was set to True (default: False) in get_parsed_data
+        # contains_keywords is somewhat redundant as the raw data actually result from Twitter filter based on the keywords reported in preprocess/project_info.json 
         logger.info('Filtered for contains_keywords...')
         flags += '_contains_keywords'
    
@@ -456,10 +453,6 @@ args_dict = {'size': size, 'langs': langs, 'include_replies': include_replies, '
     elif mode == 'random':
         logger.info('Generating random sample...')
         sample = generator.random_sample(df, size)
-    # anonymize
-    # if anonymize:
-    #     logger.info('Anonymizing sample...')
-    #     sample.loc[:, 'text'] = sample.text.apply(ProcessTweet.anonymize_text)
     
     # Write CSV file
     generator.write_sample(sample, mode, size=('bin' + str(bin_size)) if size is None else size, min_date=min_date, max_date=max_date, flags=flags)
@@ -482,5 +475,3 @@ args_dict = {'size': size, 'langs': langs, 'include_replies': include_replies, '
         with open(f_out_config_path, 'w') as f:
             json.dump(output_data, f)
 
-# if __name__ == '__main__':
-#     run({})
