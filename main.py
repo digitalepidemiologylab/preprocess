@@ -78,7 +78,7 @@ class ArgParse(object):
         parser.add_argument('-bs', '--bin_size', type=int, required=False, help='Number of tweets per bin')
         parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='random', help='Sampling mode. Random: Sample randomly. Monthly: Try to sample evenly within months.')
         parser.add_argument('-l', '--langs', default=[], nargs='+', required=False, help='Filter by language(s)')
-        parser.add_argument('--contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords')
+        parser.add_argument('--contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords spotted by Twitter filter (this option is useful only if some of the raw data does not result from Twitter filtering, which is usually not the case – hence the default value of this option is False)')
         parser.add_argument('--min_token_count', default=3, type=int, required=False, help='Minimum number of tokens')
         parser.add_argument('--include_replies', default=False, action='store_true', help='Include replies')
         parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split')
@@ -92,20 +92,21 @@ class ArgParse(object):
     def sample_v2(self):
         import utils.processing.sample_tweets_v2 as sample_tweets_v2
         parser = ArgParseDefault(description='Sample cleaned data to generate `data/2_sampled`')
-        parser.add_argument('-d', '--dtype', type=str, required=False, dest='dtype', default='anonymized', nargs='?', help='Data source type to use (can be original, anonymous, or encrypted)')
         parser.add_argument('-s', '--size', type=int, required=True, dest='size', help='Number of tweets to sample') # size parameter: Size of sample
         parser.add_argument('-bs', '--bin-size', type=int, required=False, dest='bin_size', help='Number of tweets per bin')
-        # parser.add_argument('--contains-keywords', dest='contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords')
-        parser.add_argument('-l', '--langs', default=[], nargs='+' required=False, help='Filter by language(s)') # langs
-        parser.add_argument('--include-replies', dest='include_replies', default=False, action='store_true', help='Include replies')
         parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='random', help='Sampling mode. Random: sample randomly. Monthly: try to sample evenly within months.')
+        parser.add_argument('-l', '--langs', default=['en'], nargs='+' required=False, help='Filter by language(s) (default: English)') # langs
+        parser.add_argument('--min-date', dest='min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min') # min_date
+        parser.add_argument('--max-date', dest='max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max') # max_date
+        parser.add_argument('--min-token-count', type=int, required=False, dest='min_token_count', default=4, help='Select tweets containing more than min-token-count tokens (default: min-token-count=4)') # min_token_count
+        parser.add_argument('--min-char-count', type=int, required=False, dest='min_char_count', default=9, help='Select tweets containing more than min-char-count characters (default: min-char-count=9)') # min_char_count
+        add_bool_arg(parser, 'anonymize', default=True, help='Replace usernames and URLs with filler (@user and <url>)') # anonymize
+        parser.add_argument('--contains-keywords', dest='contains_keywords', default=False, action='store_true', help='Only sample from tweets which include keywords')
+        parser.add_argument('--include-replies', dest='include_replies', default=False, action='store_true', help='Include replies')
         parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split') # seed
         parser.add_argument('--extend', action='store_true', help='Extending existing sample given by seed by removing already labelled tweets. If size is <= original sample size this has no effect except removing labelled tweets')
-        parser.add_argument('--max-date', dest='max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max') # max_date
-        parser.add_argument('--min-date', dest='min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min') # min_date
         args = parser.parse_args(sys.argv[2:])
-        sample_tweets_v2.run(dtype=args.dtype, size=args.size, bin_size=args.bin_size, #contains_keywords=args.contains_keywords, 
-                langs=args.langs, include_replies=args.include_replies, mode=args.mode, seed=args.seed, extend=args.extend, min_date=args.min_date, max_date=args.max_date)
+        sample_tweets_v2.run(size=args.size, bin_size=args.bin_size, mode=args.mode, langs=args.langs, min_date=args.min_date, max_date=args.max_date, min_token_count = args.min_token_count, min_char_count=args.min_char_count, anonymize=args.anonymize, contains_keywords=args.contains_keywords, include_replies=args.include_replies, seed=args.seed, extend=args.extend)
 
     def batch(self):
         from utils.processing.sample_tweets import SampleGenerator
