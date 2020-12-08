@@ -259,8 +259,8 @@ class ProcessTweet():
                 }
         if self.has_coordinates:
             # try to get geo data from coordinates (<0.1% of tweets)
-            geo_obj['longitude'] = self.tweet['coordinates']['coordinates'][0]
-            geo_obj['latitude'] = self.tweet['coordinates']['coordinates'][1]
+            geo_obj['longitude'] = float(self.tweet['coordinates']['coordinates'][0])
+            geo_obj['latitude'] = float(self.tweet['coordinates']['coordinates'][1])
             geo_obj['country_code'] = get_country_code_by_coords(geo_obj['longitude'], geo_obj['latitude'])
             geo_obj['geo_type'] = 1
         elif self.has_place_bounding_box:
