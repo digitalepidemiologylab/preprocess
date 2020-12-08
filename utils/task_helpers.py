@@ -14,6 +14,7 @@ from datetime import datetime
 import joblib
 import multiprocessing
 from tqdm import tqdm
+import csv
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,6 @@ def prepare_predict(args):
         df['text'] = pd.concat(res)
     # write data
     logger.info(f'Writing text column to {f_path_txt}...')
-    df[['text']].to_csv(f_path_txt, index=False)
+    df[['text']].to_csv(f_path_txt, index=False, quoting=csv.QUOTE_NONE)
     logger.info(f'Writing id/created_at column to {f_path_meta}...')
     df[['id', 'created_at']].to_csv(f_path_meta, index=False)
