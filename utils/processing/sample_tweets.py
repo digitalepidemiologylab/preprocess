@@ -236,7 +236,6 @@ def run(size=None, langs=None, include_replies=False, anonymize=True, contains_k
         logger.info('Creating sample of size {:,} or bin size {:,}...'.format(size, bin_size))
     df = get_parsed_data(usecols=['id', 'text', 'created_at', 'lang', 'is_reply', 'has_quote', 'token_count'],
             contains_keywords=contains_keywords,
-            num_files=200,
             s_date=min_date,
             e_date=max_date)
     logger.info(f'Read {len(df):,} samples. Filtering...')

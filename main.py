@@ -126,7 +126,7 @@ class ArgParse(object):
         args = parser.parse_args(sys.argv[2:3])
         if args.command == 'annotation':
             parser = ArgParseDefault(description='Print stats about annotations')
-            parser.add_argument('-m', '--mode', choices=['all', 'mturk', 'local', 'public', 'other'], type=str, required=False, default='all', help='Print stats for certain annotation modes only.')
+            parser.add_argument('-m', '--mode', choices=['all', 'mturk', 'local', 'public', 'other', '*'], type=str, required=False, default='all', help='Print stats for certain annotation modes only.')
             args = parser.parse_args(sys.argv[3:])
             stats('annotation', **vars(args))
         elif args.command == 'annotator_outliers':
