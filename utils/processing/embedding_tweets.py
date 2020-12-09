@@ -8,7 +8,7 @@ import tensorflow_transform as tft
 import matplotlib.pyplot as plt
 import os
 import sys
-sys.path.append('/drives/sdg/sample_tweets/preprocess/')
+sys.path.append('../..')
 
 from utils.helpers import get_sampled_data
 

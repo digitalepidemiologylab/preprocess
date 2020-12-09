@@ -95,7 +95,7 @@ class ArgParse(object):
         parser.add_argument('-s', '--size', type=int, required=True, dest='size', help='Number of tweets to sample') # size parameter: Size of sample
         parser.add_argument('-bs', '--bin-size', type=int, required=False, dest='bin_size', help='Number of tweets per bin')
         parser.add_argument('-m', '--mode', choices=['monthly', 'random'], required=False, default='random', help='Sampling mode. Random: sample randomly. Monthly: try to sample evenly within months.')
-        parser.add_argument('-l', '--langs', default=['en'], nargs='+' required=False, help='Filter by language(s) (default: English)') # langs
+        parser.add_argument('-l', '--langs', default=['en'], nargs='+', required=False, help='Filter by language(s) (default: English)') # langs
         parser.add_argument('--min-date', dest='min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min') # min_date
         parser.add_argument('--max-date', dest='max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max') # max_date
         parser.add_argument('--min-token-count', type=int, required=False, dest='min_token_count', default=4, help='Select tweets containing more than min-token-count tokens (default: min-token-count=4)') # min_token_count

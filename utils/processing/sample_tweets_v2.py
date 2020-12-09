@@ -27,7 +27,7 @@ import logging
 # sys.path.append('/drives/sde/wuhan_project/preprocess') # data until June 7, 2020
 # sys.path.append('/drives/sdf/martin/preprocess') # data until September 14, 2020
 sys.path.append('../..')
-from utils.helpers import get_parsed_data, get_sampled_data, get_labelled_data, get_cleaned_labelled_data, get_uploaded_batched_data, get_batched_sample_data, find_folder, #find_project_root 
+from utils.helpers import get_parsed_data, get_sampled_data, get_labelled_data, get_cleaned_labelled_data, get_uploaded_batched_data, get_batched_sample_data, find_folder #find_project_root 
 from utils.process_tweet import ProcessTweet
 
 logger = logging.getLogger(__name__)
@@ -155,16 +155,16 @@ class SampleGenerator(object):
 
     def generate_batch(self, num_tweets=None, batch_id=None, tail=True, ignore_previous=False):
         """ Generates a new batch which takes as input a large sample file provided in `data/2_sampled` and generates a new batch not including previously annotated tweets. """
-
+        
         if num_tweets is None:
             raise ValueError('Num tweets is zero. Cannot create empty batch.')
-       # vars
-       sample_folder = find_folder('2_sampled')
-       # Ids from sample file
-       df_samples = get_sampled_data()
-       if len(df_samples) == 0:
-           raise Exception('Sample file is empty. Generate a sample file first.')
-       tweet_ids_sampled = set(df_samples['tweet_id'])
+        # vars
+        sample_folder = find_folder('2_sampled')
+        # Ids from sample file
+        df_samples = get_sampled_data()
+        if len(df_samples) == 0:
+            raise Exception('Sample file is empty. Generate a sample file first.')
+        tweet_ids_sampled = set(df_samples['tweet_id'])
         # Ids from previously labelled data
         try:
             df_labels = get_labelled_data()
@@ -193,7 +193,7 @@ class SampleGenerator(object):
         logger.info('Percentage labelled: {:.2f}%'.format(100*float(len(tweet_ids_labelled)/len(tweet_ids_sampled))))
         # return conditions
         if len(still_available) <= 0:
-            logger.warn('All available tweets have been labelled'.format(len(tweet_ids_sampled), len(still available)))
+            logger.warn('All available tweets have been labelled'.format(len(tweet_ids_sampled), len(still_available)))
             return
         if num_tweets > len(still_available):
             logger.warn('Requested to create batch of {:,}, but only {:,} are still available'.format(num_tweets, len(still_available)))
@@ -237,7 +237,7 @@ class SampleGenerator(object):
         df['datetime'] = [str(idx) for idx in df.index]
         base_date_str = df.datetime[0][0:10]
         base_date = datetime.strptime(base_date_str, '%Y-%m-%d')
-        df['day_idx'] = [(datetime.strptime(str(idx[0:10], '%Y-%m-%d') - base_date)]
+        df['day_idx'] = [(datetime.strptime(str(idx[0:10]), '%Y-%m-%d') - base_date)]
         df['month_idx'] = [self.monthdelta(str(idx)[0:10], base_date_str) for idx in idx in df.datetime]
         df['idx'] = range(0, len(df))
 
@@ -261,7 +261,7 @@ def run(size=None, bin_size=None, mode='monthly', langs=None, min_date=None, max
     # Load data
     df = get_parsed_data(num_files=10, usecols=['id', 'text', 'created_at', 'lang', 'is_reply', 'is_retweet'],
             contains_keywords=contains_keywords,
-            num_files=200,s_date=min_date, e_date=max_date)
+            s_date=min_date, e_date=max_date)
     
     flags = ''
     df.reset_index(drop=True, inplace=True)
@@ -299,7 +299,7 @@ def run(size=None, bin_size=None, mode='monthly', langs=None, min_date=None, max
     # Filter by language
     if isinstance(langs, list):
         if len(langs) > 0:
-            logger.info('Filtering for languages {}...'.format(', '.join(langs))
+            logger.info('Filtering for languages {}...'.format(', '.join(langs)))
             df = df[df.lang.isin(langs)]
             flags += '_langs_{}'.format(', '.join(langs))
             df_len['4_lang'] = len(df)
@@ -379,7 +379,7 @@ def run(size=None, bin_size=None, mode='monthly', langs=None, min_date=None, max
     # Filter tweets by keywords
     keywords = ['masks', 'face covers', 'n95', 'kn95', 'ffp2']
     logger.info('Filter by keywords {}...'.format(', '.join(keywords)))
-    for i in range(len(keywords)-1);
+    for i in range(len(keywords)-1):
         keywords[i] = r'\b' + keywords[i] + r'\b|'
     keywords[-1] = r'\b' + keywords[-1] + r'\b'
     kw_regex = ''.join(keywords)
