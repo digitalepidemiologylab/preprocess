@@ -42,6 +42,7 @@ Available commands:
   clean_labels     Clean labels generated from Mturk (`data/3_labelled`) and merge/clean to generate `/data/4_cleaned_labels`
   stats            Output various stats about project
   split            Splits data into training and test data
+  prepare_predict  Prepares parsed data for prediction with txcl
 
 positional arguments:
   command     Subcommand to run
