@@ -237,7 +237,7 @@ def get_checked_tweets(mode='*', availability='*', df=None):
         df_checked.set_index('created_at', inplace=True)
     return df_checked
 
-def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, drop_retweets=False, usecols=None, nrows=None):
+def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, drop_retweets=False, usecols=None):
     """
     Return prediction data. Prediction data should be in `data/5_predicted`. All file names should have the following pattern: `predicted_{column_name}_{YYY}-{MM}-{dd}_{5-char-hash}.csv`.
     The column name can be an arbitrary tag (e.g. question tag) which should be unique.
@@ -264,14 +264,14 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
             # simple use prefix of filename
             df_column_names[f_name] = basename[len('predicted_'):-len('.csv')]
     for f_name in f_names:
-        df = pd.read_csv(f_name, nrows=nrows)
+        df = pd.read_csv(f_name)
         column_rename = {}
         for c in ['label', 'probability', 'labels', 'probabilities']:
             column_rename[c] = '{}_{}'.format(c, df_column_names[f_name])
         df.rename(columns=column_rename, inplace=True)
         df_pred = pd.concat([df_pred, df], axis=1)
     if include_raw_data:
-        df = get_parsed_data(usecols=usecols, nrows=nrows)
+        df = get_parsed_data(usecols=usecols)
         assert len(df) == len(df_pred), 'Length of prediction and raw data are not equal'
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1, sort=True)
@@ -283,7 +283,7 @@ def get_predicted_data(include_raw_data=True, dtype='anonymized', flag=None, dro
     else:
         return df_pred
 
-def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=None, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, nrows=None, geo_enrichment_type=None):
+def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=None, extra_cols=None, dtype='anonymized', s_date='', e_date='', mode='*', include_predictions=True, include_flags=False, geo_enrichment_type=None):
     """
     Returns all data including predictions and optionally certain flags
     :param include_all_data: If set to False return the minimal possible number of columns (id, predictions, filters), default: True
@@ -302,9 +302,9 @@ def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=No
         if extra_cols is not None:
             for ec in extra_cols:
                 usecols.append(ec)
-    df = get_parsed_data(usecols=usecols, nrows=nrows)
+    df = get_parsed_data(usecols=usecols)
     if include_predictions:
-        df_pred = get_predicted_data(include_raw_data=False, dtype=dtype, nrows=nrows)
+        df_pred = get_predicted_data(include_raw_data=False, dtype=dtype)
         df_pred.index = df.index
         df = pd.concat([df, df_pred], axis=1)
     # compute filters for raw data
