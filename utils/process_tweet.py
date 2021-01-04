@@ -206,18 +206,20 @@ class ProcessTweet():
 
     def get_geo_info(self):
         """
-        Tries to infer differen types of geoenrichment from tweet (ProcessTweet object)
-        0) no geo enrichment could be done
-        1) coordinates: Coordinates were provided in tweet object
-        2) place_centroid: Centroid of place bounding box
-        3) user location: Infer geo-location from user location
+        Tries to infer different types of geoenrichment from tweet (ProcessTweet object)
         Returns dictionary with the following keys:
         - longitude (float)
         - latitude (float)
         - country_code (str)
         - region (str)
         - subregion (str)
-        - geo_type (int)
+        - location_type (str): either refers to place_type provided by the Twitter "Place" object, or location_type provided by the local-geocode package
+        - geoname_id (str): unique identifier given for a location on geonames.org
+        - geo_type (int): specifies four ways of geolocation extraction:
+            0: no geolocation could be inferred
+            1: exact geocoordinates provided by Twitter
+            2: Place Polygon provided by Twitter [(longitude, latitude) refers to the centroid of the bounding box]
+            3: geolocation parsed from user.location field with local-geocode [in this case, geoname_id is also provided]
         Regions (according to World Bank):
         East Asia & Pacific, Latin America & Caribbean, Europe & Central Asia, South Asia,
         Middle East & North Africa, Sub-Saharan Africa, North America, Antarctica
@@ -255,6 +257,8 @@ class ProcessTweet():
                 'country_code': None,
                 'region': None,
                 'subregion': None,
+                'geoname_id': None,
+                'location_type': None,
                 'geo_type': 0
                 }
         if self.has_coordinates:
@@ -273,7 +277,9 @@ class ProcessTweet():
                 # sometimes places don't contain country codes, try to resolve from coordinates
                 country_code = get_country_code_by_coords(geo_obj['longitude'], geo_obj['latitude'])
             geo_obj['country_code'] = country_code
+            geo_obj['location_type'] = self.tweet['place']['place_type']
             geo_obj['geo_type'] = 2
+        
         else:
             # try to parse user location
             locations = self.gc.decode(self.tweet['user']['location'])
@@ -285,8 +291,11 @@ class ProcessTweet():
                     # sometimes country code is missing (e.g. disputed areas), try to resolve from geodata
                     country_code = get_country_code_by_coords(geo_obj['longitude'], geo_obj['latitude'])
                 geo_obj['country_code'] = country_code
+                geo_obj['geoname_id'] = locations[0]['geoname_id']
+                geo_obj['location_type'] = locations[0]['location_type']
                 geo_obj['geo_type'] = 3
-        if geo_obj['country_code']:
+
+        if not pd.isna(geo_obj['country_code']):
             # retrieve region info
             if geo_obj['country_code'] in self.map_data.ISO_A2.tolist():
                 geo_obj['region'] = get_region_by_country_code(geo_obj['country_code'])

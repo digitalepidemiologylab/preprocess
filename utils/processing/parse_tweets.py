@@ -60,7 +60,7 @@ from utils.helpers import get_project_info, get_dtypes
 from utils.process_tweet import ProcessTweet
 from datetime import datetime
 from utils.geo_helpers import load_map_data
-from local_geocode.geocode.geocode import Geocode
+from geocode.geocode import Geocode
 import shutil
 import pickle
 import gzip
@@ -156,7 +156,7 @@ def write_parquet_file(f_path_intermediary, interaction_counts, extend=False):
     for datetime_col in ['created_at', 'user.created_at']:
         df[datetime_col] = pd.to_datetime(df[datetime_col])
     # convert to categorical types
-    for col in ['country_code', 'region', 'subregion', 'geo_type', 'lang']:
+    for col in ['country_code', 'region', 'subregion', 'location_type', 'geo_type', 'lang']:
         df[col] = df[col].astype('category')
     # sort by created_at
     df.sort_values('created_at', inplace=True, ascending=True)
@@ -209,7 +209,7 @@ def dump_interaction_counts(interaction_counts):
 def run(no_parallel=False, extract_retweets=True, extract_quotes=True, extend=False, omit_last_day=True, ray_num_cpus=None):
     def extract_tweets(day, f_names, keywords):
         gc = Geocode()
-        gc.init()
+        gc.load()
         map_data = load_map_data()
         # create dirs
         for subfolder in ['tweets', 'preliminary']:
@@ -317,7 +317,7 @@ def run(no_parallel=False, extract_retweets=True, extract_quotes=True, extend=Fa
     # make sure map data is downloaded and geocode is set up
     map_data = load_map_data()
     gc = Geocode()
-    gc.prepare()
+    gc.load()
 
     # set up parallel
     if no_parallel:

@@ -365,6 +365,8 @@ def get_dtypes(usecols=None):
             "country_code": str,
             "region": str,
             "subregion": str,
+            "location_type": str,
+            "geoname_id": str,
             "geo_type": int
             }
     if usecols is not None:
