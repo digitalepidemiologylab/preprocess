@@ -5,4 +5,4 @@ pandas
 pyarrow
 ray
 joblib
-https://github.com/mar-muel/local-geocode.git
+local-geocode
