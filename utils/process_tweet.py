@@ -211,15 +211,15 @@ class ProcessTweet():
         - longitude (float)
         - latitude (float)
         - country_code (str)
-        - region (str)
-        - subregion (str)
-        - location_type (str): either refers to place_type provided by the Twitter "Place" object, or location_type provided by the local-geocode package
         - geoname_id (str): unique identifier given for a location on geonames.org
+        - location_type (str): either refers to place_type provided by the Twitter "Place" object, or location_type provided by the local-geocode package
         - geo_type (int): specifies four ways of geolocation extraction:
             0: no geolocation could be inferred
             1: exact geocoordinates provided by Twitter
             2: Place Polygon provided by Twitter [(longitude, latitude) refers to the centroid of the bounding box]
             3: geolocation parsed from user.location field with local-geocode [in this case, geoname_id is also provided]
+        - region (str)
+        - subregion (str)
         Regions (according to World Bank):
         East Asia & Pacific, Latin America & Caribbean, Europe & Central Asia, South Asia,
         Middle East & North Africa, Sub-Saharan Africa, North America, Antarctica
@@ -255,11 +255,11 @@ class ProcessTweet():
                 'longitude': None,
                 'latitude': None,
                 'country_code': None,
-                'region': None,
-                'subregion': None,
                 'geoname_id': None,
                 'location_type': None,
-                'geo_type': 0
+                'geo_type': 0,
+                'region': None,
+                'subregion': None
                 }
         if self.has_coordinates:
             # try to get geo data from coordinates (<0.1% of tweets)
