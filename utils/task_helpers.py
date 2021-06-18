@@ -123,7 +123,7 @@ def prepare_predict(args):
     if args.start_date is not None:
         df = df[df.created_at > args.start_date]
     if args.end_date is not None:
-        df = df[df.created_at > args.end_date]
+        df = df[df.created_at < args.end_date]
     logger.info('Sorting...')
     df = df.sort_values('created_at')
     if args.anonymize:
