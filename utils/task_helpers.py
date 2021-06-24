@@ -121,9 +121,9 @@ def prepare_predict(args):
     logger.info('Reading raw data...')
     df = get_parsed_data(num_files=None, s_date=args.start_date, e_date=args.end_date, usecols=['id', 'created_at', 'text'])
     if args.start_date is not None:
-        df = df[df.created_at > args.start_date]
+        df = df[df.created_at >= args.start_date]
     if args.end_date is not None:
-        df = df[df.created_at < args.end_date]
+        df = df[df.created_at <= args.end_date]
     logger.info('Sorting...')
     df = df.sort_values('created_at')
     if args.anonymize:
