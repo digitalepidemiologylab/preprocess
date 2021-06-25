@@ -298,7 +298,7 @@ def get_all_data(include_all_data=False, include_cleaned_labels=True, usecols=No
     # load data
     if usecols is None:
         # default columns
-        usecols = ['id', 'is_duplicate', 'token_count', 'extracted_quoted_tweet', 'is_retweet', 'contains_keywords', 'created_at' , 'lang']
+        usecols = ['id', 'token_count', 'is_retweet', 'contains_keywords', 'created_at' , 'lang']
         if extra_cols is not None:
             for ec in extra_cols:
                 usecols.append(ec)
