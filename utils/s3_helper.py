@@ -65,7 +65,7 @@ class S3Helper:
             sync_prefixes = []
             total_files_synced = 0
             for i in range(last_n_days):
-                day = (today - timedelta(days=i)).strftime('%Y-%m-%d')
+                day = (today - timedelta(days=i)).strftime('%Y/%m/%d')
                 sync_prefixes.append('tweets/{}/{}/'.format(project_name, day))
             for key_prefix in sync_prefixes:
                 # Sync each day separately
