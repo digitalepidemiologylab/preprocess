@@ -43,7 +43,7 @@ def generate_file_list():
     """generates dictionary of files per day"""
     f_names = []
     for file_type in ['jsonl', 'gz', 'bz2']:
-        globbed = Path(input_folder).rglob(f'*.{file_type}')
+        globbed = Path(input_folder).rglob(f'tweets-2021*.{file_type}')
         f_names.extend([str(g) for g in globbed])
     grouped_f_names = defaultdict(list)
     datefmt = '%Y-%m-%d'
