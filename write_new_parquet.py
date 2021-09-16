@@ -31,7 +31,7 @@ input_folder = os.path.join('data', '0_raw')
 
 
 manager = multiprocessing.Manager()
-# shared between all processes
+# Shared between all processes
 originals = manager.dict()
 retweet_counts = manager.dict()
 quote_counts = manager.dict()
@@ -51,7 +51,7 @@ def write_used_files(data_files):
         json.dump(data_files, f, indent=4)
 
 def generate_file_list(extend=False, omit_last_day=True):
-    """generates dictionary of files per day"""
+    """Generates dictionary of files per day"""
     f_names = []
     for file_type in ['jsonl', 'gz', 'bz2']:
         globbed = Path(input_folder).rglob(f'*.{file_type}')
@@ -130,15 +130,15 @@ def write_parquet_file(f_path_intermediary, interaction_counts, extend=False):
             df_counts[col] = df_counts[col].astype(int)
             df_existing[col] = df_counts[col].values
         df_counts = None  # free up memory
-        # append newly collected data
+        # Append newly collected data
         df = pd.concat([df_existing, df])
         df_existing = None  # free up memory
-        # after concatenation new data is at the bottom and duplicates will be removed from new data
+        # After concatenation new data is at the bottom and duplicates will be removed from new data
         df = df.drop_duplicates(subset=['id'], keep='first')
-        # sort again
+        # Sort again
         df.sort_values('created_at', inplace=True, ascending=True)
         df.reset_index(drop=True, inplace=True)
-    # write parquet file
+    # Write parquet file
     df.to_parquet(f_out)
     return len(df)
 
@@ -146,9 +146,12 @@ def main():
     # Setup
     s_time = time.time()
 
-    no_parallel = False
     extend = False
+    omit_last_day = True
 
+    grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
+
+    no_parallel = False
     # Set up parallel
     if no_parallel:
         num_cores = 1
@@ -166,21 +169,19 @@ def main():
     # Increase stack size with resource.setrlimit in order to prevent segfault 
     resource.setrlimit(resource.RLIMIT_STACK, [max_rec, -1])
     
-    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-07T12:14:00.302315.pkl')
+    # interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-07T12:14:00.302315.pkl')
+    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-15T14:30:28.247109.pkl')
     file_to_read = open(interaction_counts_f_name, 'rb')
     interaction_counts = pickle.load(file_to_read)
     # Interaction_counts is a dictionary of Pandas Series; turn it into a DataFrame
     interaction_counts = pd.DataFrame(interaction_counts)
-    
     # Store counts as shared memory
     # if ray_num_cpus is None and no_parallel:
         # ray_num_cpus = max(multiprocessing.cpu_count() - 1, 1)
     ray_num_cpus = 5
     ray.init(num_cpus=ray_num_cpus)
     data_id = ray.put(interaction_counts)
-    # Omit last 500 days: the last day is already omitted in 1_parsed/preliminary, and the 499 remaining days (500 last days = {final_day-499, final_day-498, ..., final_day-1, final_day}, where final_day is already omitted in 1_parsed/preliminary) correspond to the last 499 days in 1_parsed/preliminary ({final_day-499, final_day-498, ..., final_day-2, final_day-1})
-    # f_names_intermediary_new = sorted(os.listdir(os.path.join(output_folder, 'preliminary')))[:-499]
-    f_names_intermediary_new = sorted(os.listdir(os.path.join(output_folder, 'preliminary')))[-181:]
+    f_names_intermediary_new = sorted(os.listdir(os.path.join(output_folder, 'preliminary')))
 
     # Write new parquet files
     if len(f_names_intermediary_new) > 0:
@@ -192,19 +193,19 @@ def main():
         logger.info('No new parquet files to write...')
         num_tweets = 0
     
-    omit_last_day = True
     # Write used files
     logger.info('Writing used files...')
     if extend:
         # Get full file list
         grouped_f_names = generate_file_list(extend=False, omit_last_day=omit_last_day)
+    
     write_used_files(grouped_f_names)
 
     # Cleanup
-    # preliminary_folder = os.path.join(output_folder, 'preliminary')
-    # if os.path.isdir(preliminary_folder):
-    #     logger.info('Cleaning up intermediary files...')
-    #     shutil.rmtree(preliminary_folder)
+    preliminary_folder = os.path.join(output_folder, 'preliminary')
+    if os.path.isdir(preliminary_folder):
+        logger.info('Cleaning up intermediary files...')
+        shutil.rmtree(preliminary_folder)
     e_time = time.time()
     logger.info(f'Finished in {(e_time-s_time)/3600:.1f} hours')
     
