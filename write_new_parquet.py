@@ -64,8 +64,11 @@ def generate_file_list(extend=False, omit_last_day=True):
         if os.path.basename(f_name).startswith('tweets'):
             date_str = f_name.split('-')[1]
             day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime(datefmt)
-        else:
-             day_str = '-'.join(f_name.split('/')[-5:-2])
+        elif os.path.basename(f_name).startswith('crowdbreaks'):
+            date_str = re.findall(r'\d{4}\-\d+\-\d+\-\d+\-\d+\-\d+', os.path.basename(f_name))[0]
+            day_str = datetime.strptime(date_str, '%Y-%m-%d-%H-%M-%S').strftime(datefmt)
+        # else:
+        #      day_str = '-'.join(f_name.split('/')[-5:-2])
         if extend:
             if day_str in used_files and f_name in used_files[day_str]:
                 continue
@@ -87,7 +90,8 @@ def write_parquet_file(f_path_intermediary, interaction_counts, extend=False):
     f_out = os.path.join(output_folder, 'tweets', f'parsed_{key}.parquet')
     # Read from JSON lines
     dtypes = get_dtypes()
-    df = pd.read_json(os.path.join(output_folder, 'preliminary', f_path_intermediary), lines=True, dtype=dtypes)
+    # df = pd.read_json(os.path.join(output_folder, 'preliminary', f_path_intermediary), lines=True, dtype=dtypes)
+    df = pd.read_json(os.path.join(f_path_intermediary), lines=True, dtype=dtypes)
     if len(df) == 0:
         return 0
     # Drop duplicates
@@ -146,10 +150,10 @@ def main():
     # Setup
     s_time = time.time()
 
-    extend = False
+    extend = True
     omit_last_day = True
 
-    grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
+    # grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
 
     no_parallel = False
     # Set up parallel
@@ -161,16 +165,15 @@ def main():
 
     parallel = joblib.Parallel(n_jobs=num_cores)
     
-    max_rec = 7000000000
-    # Trying to pickle a highly recursive data structure may exceed 
-    # the maximum recursion depth, a RuntimeError will be raised in this case. 
-    # You can carefully raise this limit with sys.setrecursionlimit()
-    sys.setrecursionlimit(int(max_rec/100))
-    # Increase stack size with resource.setrlimit in order to prevent segfault 
-    resource.setrlimit(resource.RLIMIT_STACK, [max_rec, -1])
+    # max_rec = 7000000000
+    # # Trying to pickle a highly recursive data structure may exceed 
+    # # the maximum recursion depth, a RuntimeError will be raised in this case. 
+    # # You can carefully raise this limit with sys.setrecursionlimit()
+    # sys.setrecursionlimit(int(max_rec/100))
+    # # Increase stack size with resource.setrlimit in order to prevent segfault 
+    # resource.setrlimit(resource.RLIMIT_STACK, [max_rec, -1])
     
-    # interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-07T12:14:00.302315.pkl')
-    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-15T14:30:28.247109.pkl')
+    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-19T08:33:23.007682.pkl')
     file_to_read = open(interaction_counts_f_name, 'rb')
     interaction_counts = pickle.load(file_to_read)
     # Interaction_counts is a dictionary of Pandas Series; turn it into a DataFrame
@@ -181,18 +184,56 @@ def main():
     ray_num_cpus = 5
     ray.init(num_cpus=ray_num_cpus)
     data_id = ray.put(interaction_counts)
-    f_names_intermediary_new = sorted(os.listdir(os.path.join(output_folder, 'preliminary')))
 
-    # Write new parquet files
+    # f_names_intermediary_new = sorted(os.listdir(os.path.join(output_folder, 'preliminary')))
+    #
+    # # Write new parquet files
+    # if len(f_names_intermediary_new) > 0:
+    #     logger.info(f'Writing {len(f_names_intermediary_new):,} new parquet files...')
+    #     res = ray.get([write_parquet_file.remote(f_name, data_id) for f_name in tqdm(f_names_intermediary_new)])
+    #     num_tweets = sum(res)
+    #     logger.info(f'... collected a total of {num_tweets:,} tweets in {len(f_names_intermediary_new):,} parquet files')
+    # else:
+    #     logger.info('No new parquet files to write...')
+    #     num_tweets = 0
+    
+    existing_parquet_files = glob.glob(os.path.join(output_folder, 'tweets', '*.parquet'))
+    if extend:
+        existing_parquet_keys = [os.path.basename(f_name).split('.parquet')[0][len('parsed_'):] for f_name in existing_parquet_files]
+        f_names_intermediary = glob.glob(os.path.join(output_folder, 'preliminary', '*.jsonl'))
+        # List of existing Parquet files to extend
+        f_names_intermediary_existing = []
+        # List of new Parquet files to write
+        f_names_intermediary_new = []
+        # Fill the above lists
+        for f_name in f_names_intermediary:
+            if os.path.basename(f_name).split('.jsonl')[0] in existing_parquet_keys:
+                f_names_intermediary_existing.append(f_name)
+            else:
+                f_names_intermediary_new.append(f_name)
+        
+        # Extend existing Parquet files
+        if len(f_names_intermediary_existing) == 0:
+            logger.info('No files to extend.')
+        else:
+            logger.info(f'Extending {len(f_names_intermediary_existing):,} existing parquet files...')
+            res = ray.get([write_parquet_file.remote(f_name, data_id, extend=True) for f_name in tqdm(f_names_intermediary_existing)])
+            num_existing_tweets = sum(res)
+            logger.info(f'... updated existing {num_existing_tweets:,} tweets in {len(f_names_intermediary_existing):,} parquet files')
+    else:
+        # List of new Parquet files to write
+        f_names_intermediary_new = glob.glob(os.path.join(output_folder, 'preliminary', '*.jsonl'))
+
+    # Write new Parquet files
     if len(f_names_intermediary_new) > 0:
         logger.info(f'Writing {len(f_names_intermediary_new):,} new parquet files...')
         res = ray.get([write_parquet_file.remote(f_name, data_id) for f_name in tqdm(f_names_intermediary_new)])
         num_tweets = sum(res)
         logger.info(f'... collected a total of {num_tweets:,} tweets in {len(f_names_intermediary_new):,} parquet files')
     else:
-        logger.info('No new parquet files to write...')
+        logger.info('No new Parquet files to write...')
         num_tweets = 0
-    
+
     # Write used files
     logger.info('Writing used files...')
     if extend:
