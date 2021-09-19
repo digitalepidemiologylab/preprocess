@@ -312,7 +312,9 @@ def run(no_parallel=False, extract_retweets=True, extract_quotes=True, extend=Fa
     num_files = sum([len(l) for l in grouped_f_names.values()])
     num_days = len(grouped_f_names.keys())
     logger.info(f'About to parse {num_files:,} new files collected within {num_days:,} days...')
+
     existing_parquet_files = glob.glob(os.path.join(output_folder, 'tweets', '*.parquet'))
+    
     if extend and len(existing_parquet_files) == 0:
         raise Exception('The extend argument was passed, but there are no existing files to extend')
     if not extend and len(existing_parquet_files) > 0:
