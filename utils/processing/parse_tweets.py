@@ -106,14 +106,14 @@ def generate_file_list(extend=False, omit_last_day=True):
     if extend:
         used_files = read_used_files()
     for f_name in f_names:
-        # if os.path.basename(f_name).startswith('tweets'):
-        #     date_str = f_name.split('-')[1]
-        #     day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime(datefmt)
-        if os.path.basename(f_name).startswith('crowdbreaks'):
+        if os.path.basename(f_name).startswith('tweets'):
+            date_str = f_name.split('-')[1]
+            day_str = datetime.strptime(date_str, '%Y%m%d%H%M%S').strftime(datefmt)
+        elif os.path.basename(f_name).startswith('crowdbreaks'):
             date_str = re.findall(r'\d{4}\-\d+\-\d+\-\d+\-\d+\-\d+', os.path.basename(f_name))[0]
             day_str = datetime.strptime(date_str, '%Y-%m-%d-%H-%M-%S').strftime(datefmt)
-        # else:
-        #      day_str = '-'.join(f_name.split('/')[-5:-2])
+        else:
+             day_str = '-'.join(f_name.split('/')[-5:-2])
         if extend:
             if day_str in used_files and f_name in used_files[day_str]:
                 continue
