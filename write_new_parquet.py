@@ -150,7 +150,7 @@ def main():
     # Setup
     s_time = time.time()
 
-    extend = True
+    extend = False
     omit_last_day = True
 
     # grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
@@ -173,7 +173,7 @@ def main():
     # # Increase stack size with resource.setrlimit in order to prevent segfault 
     # resource.setrlimit(resource.RLIMIT_STACK, [max_rec, -1])
     
-    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-19T08:33:23.007682.pkl')
+    interaction_counts_f_name = os.path.join('/', 'tmp', 'interaction_counts_2021-09-07T12:14:00.302315.pkl')
     file_to_read = open(interaction_counts_f_name, 'rb')
     interaction_counts = pickle.load(file_to_read)
     # Interaction_counts is a dictionary of Pandas Series; turn it into a DataFrame
