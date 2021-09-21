@@ -153,7 +153,7 @@ def main():
     extend = False
     omit_last_day = True
 
-    # grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
+    grouped_f_names = generate_file_list(extend=extend, omit_last_day=omit_last_day)
 
     no_parallel = False
     # Set up parallel
