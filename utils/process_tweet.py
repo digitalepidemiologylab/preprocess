@@ -130,7 +130,7 @@ class ProcessTweet():
     @staticmethod
     def replace_usernames(text, filler='@user'):
         # replace other user handles by filler
-        text = re.sub(username_regex, filler, text)
+        text = re.sub(username_regex, filler, str(text))
         # add spaces between, and remove double spaces again
         text = text.replace(filler, f' {filler} ')
         text = ' '.join(text.split())
@@ -161,7 +161,7 @@ class ProcessTweet():
     @staticmethod
     def replace_urls(text, filler='<url>'):
         # replace other urls by filler
-        text = re.sub(url_regex, filler, text)
+        text = re.sub(url_regex, filler, str(text))
         # add spaces between, and remove double spaces again
         text = text.replace(filler, f' {filler} ')
         text = ' '.join(text.split())
