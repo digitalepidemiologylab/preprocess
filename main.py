@@ -85,8 +85,8 @@ class ArgParse(object):
         parser.add_argument('--seed', type=int, required=False, default=None, help='Random state split')
         parser.add_argument('--extend', action='store_true', help='Extending existing sample given by seed by removing already labelled tweets. If size is <= original sample size this has no effect except removing labelled tweets');
         add_bool_arg(parser, 'anonymize', default=True, help='Replace usernames and URLs with filler (@user and <url>)')
-        parser.add_argument('--max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max')
-        parser.add_argument('--min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min')
+        parser.add_argument('--max_date', required=False, default=None, help='Sample until date (YYYY-MM-DD), default: No max. IMPORTANT NOTE: tweets from max_date are *not included*.')
+        parser.add_argument('--min_date', required=False, default=None, help='Sample from date (YYYY-MM-DD), default: No min. IMPORTANT NOTE: tweets posted on min_date are *included*.')
         args = parser.parse_args(sys.argv[2:])
         sample_tweets.run(size=args.size, contains_keywords=args.contains_keywords, anonymize=args.anonymize, min_token_count=args.min_token_count, langs=args.langs, include_replies=args.include_replies, mode=args.mode, seed=args.seed, extend=args.extend, bin_size=args.bin_size, min_date=args.min_date, max_date=args.max_date)
 
@@ -162,8 +162,8 @@ class ArgParse(object):
         from utils.task_helpers import prepare_predict
         parser = ArgParseDefault(description='Prepare data for prediction with the text-classification library. \
                 This function generates two files (1 for text 1 for IDs/created_at) under data/other. The text.csv file can then be predicted.')
-        parser.add_argument('--start_date', required=False, default=None, help='Filter start date')
-        parser.add_argument('--end_date', required=False, default=None, help='Filter end date')
+        parser.add_argument('--start_date', required=False, default=None, help='Filter start date. IMPORTANT NOTE: tweets from s_date are *included*.')
+        parser.add_argument('--end_date', required=False, default=None, help='Filter end date. IMPORTANT NOTE: tweets from e_date are *not included*.')
         add_bool_arg(parser, 'anonymize', default=True, help='Replace usernames and URLs with filler (@user and <url>)')
         parser.add_argument('--url_filler', required=False, default='<url>', help='Filler for urls (if anonymize)')
         parser.add_argument('--user_filler', required=False, default='@user', help='Filler for user names (if anonymize)')
