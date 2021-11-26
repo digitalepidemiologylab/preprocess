@@ -43,7 +43,7 @@ def get_parsed_data(contains_keywords=False, usecols=None, s_date=None, e_date=N
             if s_date is not None:
                 if not isinstance(s_date, datetime):
                     s_date = datetime.strptime(s_date, '%Y-%m-%d')
-                f_names = [f_name for f_name in f_names if f_names_dates[f_name] > s_date]
+                f_names = [f_name for f_name in f_names if f_names_dates[f_name] >= s_date]
             if e_date is not None:
                 if not isinstance(e_date, datetime):
                     e_date = datetime.strptime(e_date, '%Y-%m-%d')
