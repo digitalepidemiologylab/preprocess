@@ -65,8 +65,13 @@ class S3Helper:
             sync_prefixes = []
             total_files_synced = 0
             for i in range(last_n_days):
-                day = (today - timedelta(days=i)).strftime('%Y/%m/%d')
-                sync_prefixes.append('tweets/{}/{}/'.format(project_name, day))
+                date = (today - timedelta(days=i))
+                date_year = str(date.year)
+                date_month = date.month
+                date_month = '0' + str(date_month) if date_month < 10 else str(date_month)
+                date_day = date.day
+                date_day = '0' + str(date_day) if date_day < 10 else str(date_day)
+                sync_prefixes.append('tweets/project_{}/{}/{}/{}/'.format(project_name, date_year, date_month, date_day))
             for key_prefix in sync_prefixes:
                 # Sync each day separately
                 _, num_files_synced = self.download_files(key_prefix, local_tweets_dir, local_files, parallel=True)
@@ -74,7 +79,7 @@ class S3Helper:
             if num_files_synced == 0:
                 logger.info('Nothing to sync - Everything up-to-date.')
         else:
-            key_prefix = 'tweets/{}/'.format(project_name)
+            key_prefix = 'tweets/project_{}/'.format(project_name)
             remote_files, num_files_synced = self.download_files(key_prefix, local_tweets_dir, local_files, parallel=True)
             # remove old files
             num_files_removed = self.remove_old_files(remote_files=remote_files, local_files=local_files, local_dir=local_tweets_dir)
@@ -86,7 +91,7 @@ class S3Helper:
         for mode in ['local', 'mturk', 'public', 'other']:
             logger.info('... of type {}...'.format(mode))
             mode_prefix = mode + '-batch-job' if mode in ['local', 'mturk'] else mode
-            key_prefix = 'other/csv/{}/{}-results'.format(project_name, mode_prefix)
+            key_prefix = 'other/csv/project_{}/{}-results'.format(project_name, mode_prefix)
             annotation_dir = os.path.join(find_project_root(), 'data', '3_labelled', mode)
             local_files = [os.path.basename(p) for p in glob.glob(os.path.join(annotation_dir, '*.csv'))]
             remote_files, r_num_files_synced = self.download_files(key_prefix, annotation_dir, local_files)
@@ -98,7 +103,7 @@ class S3Helper:
                     os.makedirs(batch_dir)
                 local_files = [os.path.basename(p) for p in glob.glob(os.path.join(batch_dir, '*.csv'))]
                 mode_prefix = mode + '-batch-job' if mode in ['local', 'mturk'] else mode
-                key_prefix = 'other/csv/{}/{}-tweets'.format(project_name, mode_prefix)
+                key_prefix = 'other/csv/project_{}/{}-tweets'.format(project_name, mode_prefix)
                 remote_files, t_num_files_synced = self.download_files(key_prefix, batch_dir, local_files)
                 t_num_files_removed = self.remove_old_files(remote_files=remote_files, local_files=local_files, local_dir=batch_dir)
                 if r_num_files_synced == r_num_files_removed == t_num_files_synced == t_num_files_removed == 0:
@@ -106,7 +111,7 @@ class S3Helper:
 
     def sync_media_data(self, project_name):
         logger.info('Syncing media data ...')
-        key_prefix = 'media/{}/'.format(project_name)
+        key_prefix = 'media/project_{}/'.format(project_name)
         local_dir = os.path.join(find_project_root(), 'data', '0_raw', 'media')
         local_files = [os.path.basename(p) for p in glob.glob(os.path.join(os.path.join(local_dir, '*')))]
         remote_files, r_num_files_synced = self.download_files(key_prefix, local_dir, local_files)
